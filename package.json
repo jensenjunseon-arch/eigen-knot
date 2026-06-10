@@ -9,7 +9,9 @@
     "type": "git",
     "url": "https://github.com/jensenjunseon-arch/eigen-knot.git"
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -21,6 +23,10 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",
     "@fontsource/cormorant-garamond": "^5.0.0",
+    "@fontsource/gowun-batang": "^5.2.8",
+    "@fontsource/gowun-dodum": "^5.2.8",
+    "@fontsource/nanum-myeongjo": "^5.2.11",
+    "@fontsource/noto-sans-kr": "^5.2.9",
     "@fontsource/noto-serif-kr": "^5.0.0",
     "@sparticuz/chromium": "^130.0.0",
     "archiver": "^7.0.1",

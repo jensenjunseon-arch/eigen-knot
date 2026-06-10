@@ -32,13 +32,14 @@ npm run dev       # 🎛 web studio at http://localhost:5173
 
 ### Web studio (recommended)
 
-`npm run dev` opens the editing studio:
+`npm run dev` opens the studio. The first screen is a single input — paste your
+article, press **AI로 카드 만들기**, and you land in the editor:
 
-1. **글 → AI 초안** — paste your article, click once (needs `ANTHROPIC_API_KEY`, see below)
-2. **이미지 업로드** — drop in the issue's background photo
-3. **카드 클릭 → 인라인 편집** — every field editable; overflow warnings (⚠) flag cards that need trimming
-4. **dim 슬라이더** — per-deck and per-card darkness over the photo
-5. **PNG 10장 내보내기** — server-side Playwright capture → ZIP download
+1. **카드 클릭 → 인라인 편집** — every field editable; ⚠ flags cards that overflow (both axes)
+2. **디자인** — 폰트 선택(명조/고딕 5종, self-hosted) · 글자 크기 슬라이더 · 강조색 프리셋+HEX/RGB · 워터마크 문구 · **플랫폼 사이즈 프리셋** (Instagram 4:5 / 1:1, 스토리 9:16, X 16:9)
+3. **배경** — 사진 업로드(자동 다운스케일) · focal · dim 슬라이더(일괄+카드별)
+4. **카드 구성** — 10장 중 내보낼 카드를 체크박스로 선택 (파일 번호 자동 정렬)
+5. **PNG 내보내기** — server-side Playwright capture → ZIP download
 
 > The AI output is a *draft*. The 10% of manual polish — trimming a line, darkening a photo, moving an emphasis — is what makes it publishable. The studio is built around that loop.
 

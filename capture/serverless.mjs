@@ -1,17 +1,19 @@
 // Browser-agnostic capture core. Given an already-launched browser and the base
-// URL of a DEPLOYED build of this app, it screenshots all 10 cards by navigating
-// to the app's own capture page (?capture=1&i=N) and injecting the deck. Fonts
-// load from that same deployment, so headless rendering matches the studio.
+// URL of a DEPLOYED build of this app, it screenshots the deck's active cards by
+// navigating to the app's own capture page (?capture=1&i=N) and injecting the
+// deck. Fonts load from that same deployment, so headless rendering matches the
+// studio. Viewport follows the deck's canvas size (platform presets).
 //
 // Used by the Vercel function (api/capture.js, @sparticuz/chromium browser) AND
-// by the local verifier (full playwright + vite preview) — same code path.
+// by the local pipeline verifier — same code path.
 
-import { CARD_NAMES, CARD_COUNT, cardFilename } from "../scripts/shared.mjs";
+import { ROLE_CARDNAMES, deckRoles, deckCanvas, cardFilename } from "../scripts/shared.mjs";
 
 export async function captureDeckViaUrl(deck, { browser, baseUrl, scale = 1 }) {
   const base = baseUrl.replace(/\/$/, "");
-  const ctx = await browser.newContext({ viewport: { width: 1080, height: 1350 }, deviceScaleFactor: scale });
-  // Inject the deck (bg already a dataURL) for every page in the context.
+  const { w, h } = deckCanvas(deck);
+  const roles = deckRoles(deck);
+  const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: scale });
   await ctx.addInitScript((d) => {
     window.__EK_DECK__ = d;
   }, deck);
@@ -20,14 +22,14 @@ export async function captureDeckViaUrl(deck, { browser, baseUrl, scale = 1 }) {
   const files = [];
   let overflowAny = false;
   try {
-    for (let i = 0; i < CARD_COUNT; i++) {
+    for (let i = 0; i < roles.length; i++) {
       await page.goto(`${base}/?capture=1&i=${i}`, { waitUntil: "load", timeout: 30000 });
       await page.waitForFunction(() => window.__EK_READY__ === true, undefined, { timeout: 25000 });
       const overflow = await page.evaluate(() => window.__EK_OVERFLOW__ === true);
       if (overflow) overflowAny = true;
       const buffer = await page.locator(".ek-card").screenshot({ type: "png" });
       files.push({
-        name: cardFilename(i + 1, deck.meta.slug, deck.meta.issue, CARD_NAMES[i]),
+        name: cardFilename(i + 1, deck.meta.slug, deck.meta.issue, ROLE_CARDNAMES[roles[i]]),
         buffer,
         overflow,
       });

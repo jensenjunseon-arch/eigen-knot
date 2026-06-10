@@ -5,20 +5,35 @@
 import { readFileSync } from "node:fs";
 import { extname } from "node:path";
 
-// Ordered card filename slugs — must match CARD_ORDER in src/types.ts.
-export const CARD_NAMES = [
-  "cover",
-  "summary",
-  "definition",
-  "two-stories",
-  "diagnosis",
-  "analysis",
-  "grid",
-  "claim",
-  "conclusion",
-  "closing",
-];
-export const CARD_COUNT = CARD_NAMES.length;
+// Role → filename slug, in canonical order — must match CARD_ORDER in
+// src/types.ts. A deck may select an ordered subset via deck.cards.
+export const ROLE_CARDNAMES = {
+  cover: "cover",
+  summary: "summary",
+  definition: "definition",
+  compare: "two-stories",
+  diagnosis: "diagnosis",
+  analysis: "analysis",
+  grid: "grid",
+  claim: "claim",
+  conclusion: "conclusion",
+  closing: "closing",
+};
+export const ALL_ROLES = Object.keys(ROLE_CARDNAMES);
+
+/** The deck's active roles in canonical order. */
+export function deckRoles(deck) {
+  if (!Array.isArray(deck.cards) || deck.cards.length === 0) return ALL_ROLES;
+  const wanted = new Set(deck.cards);
+  return ALL_ROLES.filter((r) => wanted.has(r));
+}
+
+/** The deck's canvas size (default Instagram 4:5). */
+export function deckCanvas(deck) {
+  const w = deck.size?.w;
+  const h = deck.size?.h;
+  return Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0 ? { w, h } : { w: 1080, h: 1350 };
+}
 
 export function kebab(s) {
   return String(s)

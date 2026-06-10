@@ -1,5 +1,5 @@
-import { Fragment, type CSSProperties } from "react";
-import { EK, FONT, TYPE } from "@/design/tokens";
+import { Fragment } from "react";
+import { EK, FONT } from "@/design/tokens";
 import type {
   CompareContent,
   CompareSide,
@@ -16,29 +16,20 @@ import type {
   CardSpec,
 } from "@/types";
 import { Rich } from "@/lib/richText";
-import { BaseProps, CardBase, CardBody, Kicker, Label, Rule } from "./CardBase";
-
-// Shared type fragments (module-scoped — no global `styles` collision, PRD §11.8).
-const h2Style: CSSProperties = {
-  margin: 0,
-  fontWeight: 600,
-  fontSize: TYPE.h2,
-  lineHeight: 1.25,
-  letterSpacing: "-0.01em",
-};
-const paraStyle: CSSProperties = { margin: 0, fontSize: TYPE.body, lineHeight: 1.6, fontWeight: 400 };
+import { BaseProps, CardBase, CardBody, Kicker, Label, Rule, resolveTheme, useTheme } from "./CardBase";
 
 type CardProps<C> = BaseProps & { c: C; top: number };
 
 /* 01 — Cover ────────────────────────────────────────────────────────────── */
-function CoverCard({ bg, dim, focal, c, top }: CardProps<CoverContent>) {
+function CoverCard({ c, top, ...base }: CardProps<CoverContent>) {
+  const t = base.theme;
   return (
-    <CardBase bg={bg} dim={dim} focal={focal}>
+    <CardBase {...base}>
       <CardBody top={top}>
         <Kicker>{c.kicker}</Kicker>
         <h1
           className="ek-balance"
-          style={{ margin: 0, fontWeight: 600, fontSize: TYPE.coverHead, lineHeight: 1.18, letterSpacing: "-0.015em" }}
+          style={{ margin: 0, fontWeight: 600, fontSize: t.ts(84), lineHeight: 1.18, letterSpacing: "-0.015em" }}
         >
           <Rich text={c.headline} />
         </h1>
@@ -48,17 +39,18 @@ function CoverCard({ bg, dim, focal, c, top }: CardProps<CoverContent>) {
 }
 
 /* 02 — Three-line summary ───────────────────────────────────────────────── */
-function SummaryCard({ bg, dim, focal, c, top }: CardProps<SummaryContent>) {
+function SummaryCard({ c, top, ...base }: CardProps<SummaryContent>) {
+  const t = base.theme;
   return (
-    <CardBase bg={bg} dim={dim} focal={focal}>
+    <CardBase {...base}>
       <CardBody top={top}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 44 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: t.ts(44) }}>
           {c.lines.map((line, i) => (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 28, alignItems: "baseline" }}>
-              <span style={{ fontFamily: FONT.display, fontStyle: "italic", fontWeight: 600, fontSize: 40, color: EK.whiteFaint }}>
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: t.ts(28), alignItems: "baseline" }}>
+              <span style={{ fontFamily: FONT.display, fontStyle: "italic", fontWeight: 600, fontSize: t.ts(40), color: EK.whiteFaint }}>
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <span style={{ fontSize: TYPE.body, lineHeight: 1.5, fontWeight: 400 }}>
+              <span style={{ fontSize: t.ts(36), lineHeight: 1.5, fontWeight: 400 }}>
                 <Rich text={line} />
               </span>
             </div>
@@ -70,21 +62,22 @@ function SummaryCard({ bg, dim, focal, c, top }: CardProps<SummaryContent>) {
 }
 
 /* 03 — Definition ───────────────────────────────────────────────────────── */
-function DefinitionCard({ bg, dim, focal, c, top }: CardProps<DefinitionContent>) {
+function DefinitionCard({ c, top, ...base }: CardProps<DefinitionContent>) {
+  const t = base.theme;
   return (
-    <CardBase bg={bg} dim={dim} focal={focal}>
+    <CardBase {...base}>
       <CardBody top={top}>
-        <h2 style={h2Style}>
+        <h2 style={{ margin: 0, fontWeight: 600, fontSize: t.ts(60), lineHeight: 1.25, letterSpacing: "-0.01em" }}>
           <Rich text={c.term_ko} />
         </h2>
         <div
           className="ek-nowrap"
-          style={{ fontFamily: FONT.display, fontStyle: "italic", fontWeight: 500, fontSize: 34, color: EK.whiteFaint, marginTop: 10 }}
+          style={{ fontFamily: FONT.display, fontStyle: "italic", fontWeight: 500, fontSize: t.ts(34), color: EK.whiteFaint, marginTop: t.ts(10) }}
         >
           {c.term_en}
         </div>
         <Rule />
-        <p style={paraStyle}>
+        <p style={{ margin: 0, fontSize: t.ts(36), lineHeight: 1.6, fontWeight: 400 }}>
           <Rich text={c.body} />
         </p>
       </CardBody>
@@ -94,34 +87,36 @@ function DefinitionCard({ bg, dim, focal, c, top }: CardProps<DefinitionContent>
 
 /* 04 — ★ Two stories (the signature contrast card) ──────────────────────── */
 function CompareBlock({ side }: { side: CompareSide }) {
+  const t = useTheme();
   return (
     <div>
       <Label>{side.label}</Label>
-      <div style={{ fontSize: 46, fontWeight: 600, lineHeight: 1.3, letterSpacing: "-0.01em" }}>
+      <div style={{ fontSize: t.ts(46), fontWeight: 600, lineHeight: 1.3, letterSpacing: "-0.01em" }}>
         <Rich text={side.headline} />
       </div>
-      <div style={{ fontSize: TYPE.sub, lineHeight: 1.5, color: EK.whiteFaint, marginTop: 12 }}>
+      <div style={{ fontSize: t.ts(26), lineHeight: 1.5, color: EK.whiteFaint, marginTop: t.ts(12) }}>
         <Rich text={side.detail} />
       </div>
     </div>
   );
 }
-function CompareCard({ bg, dim, focal, c, top }: CardProps<CompareContent>) {
+function CompareCard({ c, top, ...base }: CardProps<CompareContent>) {
+  const t = base.theme;
   return (
-    <CardBase bg={bg} dim={dim} focal={focal}>
+    <CardBase {...base}>
       <CardBody top={top}>
         {/* Both blocks share IDENTICAL formatting so the CONTENT difference speaks. */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 30 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: t.ts(30) }}>
           <CompareBlock side={c.left} />
           <div style={{ height: 2, background: EK.whiteFaint, opacity: 0.5 }} />
           <CompareBlock side={c.right} />
         </div>
-        <div style={{ marginTop: 40 }}>
-          <div style={{ fontSize: 44, fontWeight: 600, color: EK.wine, lineHeight: 1.3, letterSpacing: "-0.01em" }}>
+        <div style={{ marginTop: t.ts(40) }}>
+          <div style={{ fontSize: t.ts(44), fontWeight: 600, color: t.accent, lineHeight: 1.3, letterSpacing: "-0.01em" }}>
             <Rich text={c.common.punch} />
           </div>
           {c.common.sub && (
-            <div style={{ fontSize: TYPE.sub, color: EK.whiteFaint, marginTop: 12 }}>
+            <div style={{ fontSize: t.ts(26), color: EK.whiteFaint, marginTop: t.ts(12) }}>
               <Rich text={c.common.sub} />
             </div>
           )}
@@ -132,17 +127,18 @@ function CompareCard({ bg, dim, focal, c, top }: CardProps<CompareContent>) {
 }
 
 /* 05 — Diagnosis ────────────────────────────────────────────────────────── */
-function DiagnosisCard({ bg, dim, focal, c, top }: CardProps<DiagnosisContent>) {
+function DiagnosisCard({ c, top, ...base }: CardProps<DiagnosisContent>) {
+  const t = base.theme;
   return (
-    <CardBase bg={bg} dim={dim} focal={focal}>
+    <CardBase {...base}>
       <CardBody top={top}>
-        <h2 style={h2Style}>
+        <h2 style={{ margin: 0, fontWeight: 600, fontSize: t.ts(60), lineHeight: 1.25, letterSpacing: "-0.01em" }}>
           <Rich text={c.headline} />
         </h2>
         <Rule />
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: t.ts(24) }}>
           {c.paras.map((p, i) => (
-            <p key={i} style={paraStyle}>
+            <p key={i} style={{ margin: 0, fontSize: t.ts(36), lineHeight: 1.6, fontWeight: 400 }}>
               <Rich text={p} />
             </p>
           ))}
@@ -153,19 +149,20 @@ function DiagnosisCard({ bg, dim, focal, c, top }: CardProps<DiagnosisContent>) 
 }
 
 /* 06 — Analysis (list) ──────────────────────────────────────────────────── */
-function AnalysisCard({ bg, dim, focal, c, top }: CardProps<AnalysisContent>) {
+function AnalysisCard({ c, top, ...base }: CardProps<AnalysisContent>) {
+  const t = base.theme;
   return (
-    <CardBase bg={bg} dim={dim} focal={focal}>
+    <CardBase {...base}>
       <CardBody top={top}>
-        <h2 style={h2Style}>
+        <h2 style={{ margin: 0, fontWeight: 600, fontSize: t.ts(60), lineHeight: 1.25, letterSpacing: "-0.01em" }}>
           <Rich text={c.headline} />
         </h2>
         <Rule />
-        <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: t.ts(22) }}>
           {c.items.map((it, i) => (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 22, alignItems: "start" }}>
-              <span style={{ width: 9, height: 9, borderRadius: "50%", background: EK.whiteFaint, marginTop: 18 }} />
-              <span style={{ fontSize: TYPE.bodySm, lineHeight: 1.5 }}>
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: t.ts(22), alignItems: "start" }}>
+              <span style={{ width: t.ts(9), height: t.ts(9), borderRadius: "50%", background: EK.whiteFaint, marginTop: t.ts(18) }} />
+              <span style={{ fontSize: t.ts(32), lineHeight: 1.5 }}>
                 <Rich text={it} />
               </span>
             </div>
@@ -177,19 +174,20 @@ function AnalysisCard({ bg, dim, focal, c, top }: CardProps<AnalysisContent>) {
 }
 
 /* 07 — Contrast grid ────────────────────────────────────────────────────── */
-function GridCard({ bg, dim, focal, c, top }: CardProps<GridContent>) {
+function GridCard({ c, top, ...base }: CardProps<GridContent>) {
+  const t = base.theme;
   return (
-    <CardBase bg={bg} dim={dim} focal={focal}>
+    <CardBase {...base}>
       <CardBody top={top}>
         {/* Left labels stay nowrap so conclusions align on one X-axis (§3.2);
             the right column wraps (keep-all) — long lines must never clip. */}
-        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 30, rowGap: 34, alignItems: "baseline" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: t.ts(30), rowGap: t.ts(34), alignItems: "baseline" }}>
           {c.rows.map((r, i) => (
             <Fragment key={i}>
-              <span className="ek-nowrap" style={{ fontSize: 34, color: EK.whiteFaint, fontWeight: 400 }}>
+              <span className="ek-nowrap" style={{ fontSize: t.ts(34), color: EK.whiteFaint, fontWeight: 400 }}>
                 <Rich text={r[0]} />
               </span>
-              <span style={{ fontSize: 40, color: EK.white, fontWeight: 600, lineHeight: 1.4 }}>
+              <span style={{ fontSize: t.ts(40), color: EK.white, fontWeight: 600, lineHeight: 1.4 }}>
                 <Rich text={r[1]} />
               </span>
             </Fragment>
@@ -201,21 +199,22 @@ function GridCard({ bg, dim, focal, c, top }: CardProps<GridContent>) {
 }
 
 /* 08 — Claim ────────────────────────────────────────────────────────────── */
-function ClaimCard({ bg, dim, focal, c, top }: CardProps<ClaimContent>) {
+function ClaimCard({ c, top, ...base }: CardProps<ClaimContent>) {
+  const t = base.theme;
   return (
-    <CardBase bg={bg} dim={dim} focal={focal}>
+    <CardBase {...base}>
       <CardBody top={top}>
-        <h2 style={h2Style}>
+        <h2 style={{ margin: 0, fontWeight: 600, fontSize: t.ts(60), lineHeight: 1.25, letterSpacing: "-0.01em" }}>
           <Rich text={c.headline} />
         </h2>
         <Rule />
         {c.emphasis && (
-          <div style={{ fontSize: 52, fontWeight: 600, color: EK.wine, lineHeight: 1.3, letterSpacing: "-0.01em" }}>
+          <div style={{ fontSize: t.ts(52), fontWeight: 600, color: t.accent, lineHeight: 1.3, letterSpacing: "-0.01em" }}>
             <Rich text={c.emphasis} />
           </div>
         )}
         {c.sub && (
-          <p style={{ margin: "22px 0 0", fontSize: TYPE.body, lineHeight: 1.6, color: EK.whiteFaint }}>
+          <p style={{ margin: `${t.ts(22)}px 0 0`, fontSize: t.ts(36), lineHeight: 1.6, color: EK.whiteFaint }}>
             <Rich text={c.sub} />
           </p>
         )}
@@ -225,17 +224,18 @@ function ClaimCard({ bg, dim, focal, c, top }: CardProps<ClaimContent>) {
 }
 
 /* 09 — Conclusion (couplet) ─────────────────────────────────────────────── */
-function ConclusionCard({ bg, dim, focal, c, top }: CardProps<ConclusionContent>) {
+function ConclusionCard({ c, top, ...base }: CardProps<ConclusionContent>) {
+  const t = base.theme;
   return (
-    <CardBase bg={bg} dim={dim} focal={focal}>
+    <CardBase {...base}>
       <CardBody top={top}>
-        <p style={paraStyle}>
+        <p style={{ margin: 0, fontSize: t.ts(36), lineHeight: 1.6, fontWeight: 400 }}>
           <Rich text={c.intro} />
         </p>
         <Rule />
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: t.ts(16) }}>
           {c.couplet.map((l, i) => (
-            <div key={i} style={{ fontSize: 48, fontWeight: 600, lineHeight: 1.3, letterSpacing: "-0.01em" }}>
+            <div key={i} style={{ fontSize: t.ts(48), fontWeight: 600, lineHeight: 1.3, letterSpacing: "-0.01em" }}>
               <Rich text={l} />
             </div>
           ))}
@@ -246,9 +246,10 @@ function ConclusionCard({ bg, dim, focal, c, top }: CardProps<ConclusionContent>
 }
 
 /* 10 — Closing (fixed) ──────────────────────────────────────────────────── */
-function ClosingCard({ bg, dim, focal, meta }: BaseProps & { meta: DeckMeta }) {
+function ClosingCard({ meta, ...base }: BaseProps & { meta: DeckMeta }) {
+  const t = base.theme;
   return (
-    <CardBase bg={bg} dim={dim} focal={focal} watermark={false}>
+    <CardBase {...base} watermark={false}>
       <div
         style={{
           position: "absolute",
@@ -258,22 +259,22 @@ function ClosingCard({ bg, dim, focal, meta }: BaseProps & { meta: DeckMeta }) {
           alignItems: "center",
           justifyContent: "center",
           textAlign: "center",
-          padding: "0 120px",
+          padding: `0 ${Math.round(120 * t.sx)}px`,
         }}
       >
-        <div style={{ fontSize: 40, fontWeight: 500, lineHeight: 1.5 }}>현상 뒤에 본질을 꿰뚫는 시선</div>
-        <div style={{ fontSize: 30, color: EK.whiteFaint, marginTop: 14 }}>심리학자가 발행하는 뉴스레터</div>
-        {/* The single chartreuse moment in the whole deck — brand self-reference (§2.1). */}
+        <div style={{ fontSize: t.ts(40), fontWeight: 500, lineHeight: 1.5 }}>현상 뒤에 본질을 꿰뚫는 시선</div>
+        <div style={{ fontSize: t.ts(30), color: EK.whiteFaint, marginTop: t.ts(14) }}>심리학자가 발행하는 뉴스레터</div>
+        {/* The single accent2 moment in the whole deck — brand self-reference (§2.1). */}
         <div
           className="ek-nowrap"
-          style={{ fontFamily: FONT.display, fontStyle: "italic", fontWeight: 600, fontSize: 66, color: EK.chartreuse, margin: "50px 0 6px" }}
+          style={{ fontFamily: FONT.display, fontStyle: "italic", fontWeight: 600, fontSize: t.ts(66), color: t.accent2, margin: `${t.ts(50)}px 0 ${t.ts(6)}px` }}
         >
-          eigen knot
+          {t.watermark.trim() !== "" ? t.watermark : "eigen knot"}
         </div>
-        <div style={{ fontSize: 26, color: EK.whiteFaint }}>[아이겐 노트]</div>
+        <div style={{ fontSize: t.ts(26), color: EK.whiteFaint }}>[아이겐 노트]</div>
         <div
           className="ek-nowrap"
-          style={{ fontFamily: FONT.display, fontStyle: "italic", fontSize: 27, color: EK.whiteFaint, marginTop: 42, letterSpacing: "0.02em" }}
+          style={{ fontFamily: FONT.display, fontStyle: "italic", fontSize: t.ts(27), color: EK.whiteFaint, marginTop: t.ts(42), letterSpacing: "0.02em" }}
         >
           Weekly Insight · {meta.issue} knot&nbsp;&nbsp;|&nbsp;&nbsp;Subscribe at eigenknot.com
         </div>
@@ -285,7 +286,8 @@ function ClosingCard({ bg, dim, focal, meta }: BaseProps & { meta: DeckMeta }) {
 /* Dispatcher ────────────────────────────────────────────────────────────── */
 export function RenderCard({ deck, spec }: { deck: Deck; spec: CardSpec }) {
   const dim = deck.dims?.[spec.role] ?? spec.dim;
-  const base: BaseProps = { bg: deck.bg, dim, focal: deck.focal };
+  const theme = resolveTheme(deck);
+  const base: BaseProps = { bg: deck.bg, dim, focal: deck.focal, theme };
   const c = deck.content;
   switch (spec.role) {
     case "cover":

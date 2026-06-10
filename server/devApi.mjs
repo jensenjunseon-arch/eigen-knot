@@ -10,7 +10,7 @@
 // freshly built bundle.
 
 import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync, readFileSync, existsSync, createReadStream, statSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, createReadStream, statSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -110,6 +110,11 @@ export function devApi() {
             const issueDir = `issue-${String(deck.meta.issue).padStart(3, "0")}`;
             const outDir = join(ROOT, "output", issueDir);
             mkdirSync(outDir, { recursive: true });
+            // Clear stale outputs — re-exports with fewer cards or a different
+            // numbering must not leave orphan files from the previous run.
+            for (const f of readdirSync(outDir)) {
+              if (f.endsWith(".png") || f.endsWith(".zip")) rmSync(join(outDir, f), { force: true });
+            }
             const tmpDeck = join(outDir, ".studio-deck.json");
             writeFileSync(tmpDeck, JSON.stringify(deck));
 

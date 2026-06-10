@@ -7,10 +7,11 @@
 import { build, preview } from "vite";
 import { chromium } from "playwright";
 import archiver from "archiver";
-import { createWriteStream, existsSync, mkdirSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, resolve, basename } from "node:path";
-import { CARD_NAMES, CARD_COUNT, cardFilename, zipName } from "../scripts/shared.mjs";
+import { zipName } from "../scripts/shared.mjs";
+import { captureDeckViaUrl } from "./serverless.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -25,32 +26,18 @@ export async function captureDeck(deck, { outDir, scale = 1, port = 5180, zip = 
 
   console.log("· starting preview server…");
   const server = await preview({ root: ROOT, preview: { port, strictPort: false } });
-  const base = server.resolvedUrls.local[0].replace(/\/$/, "");
+  const baseUrl = server.resolvedUrls.local[0].replace(/\/$/, "");
 
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1080, height: 1350 }, deviceScaleFactor: scale });
-  // Inject the deck (bg already inlined as a dataURL) for every page in the context.
-  await ctx.addInitScript((d) => {
-    window.__EK_DECK__ = d;
-  }, deck);
+  const { files, overflowAny } = await captureDeckViaUrl(deck, { browser, baseUrl, scale });
 
-  const page = await ctx.newPage();
   const written = [];
-  let overflowAny = false;
-
-  for (let i = 0; i < CARD_COUNT; i++) {
-    await page.goto(`${base}/?capture=1&i=${i}`, { waitUntil: "load" });
-    await page.waitForFunction(() => window.__EK_READY__ === true, undefined, { timeout: 20000 });
-    const overflow = await page.evaluate(() => window.__EK_OVERFLOW__ === true);
-    if (overflow) {
-      overflowAny = true;
-      console.warn(`  ⚠ ${String(i + 1).padStart(2, "0")} ${CARD_NAMES[i]} — body overflows safe area (trim copy / drop font size)`);
-    }
-    const file = cardFilename(i + 1, deck.meta.slug, deck.meta.issue, CARD_NAMES[i]);
-    const path = join(out, file);
-    await page.locator(".ek-card").screenshot({ path, type: "png" });
-    written.push({ file, path, overflow });
-    console.log(`  ✓ ${file}`);
+  for (const f of files) {
+    const path = join(out, f.name);
+    writeFileSync(path, f.buffer);
+    written.push({ file: f.name, path, overflow: f.overflow });
+    if (f.overflow) console.warn(`  ⚠ ${f.name} — overflows safe area (trim copy / lower 폰트 크기)`);
+    console.log(`  ✓ ${f.name}`);
   }
 
   await browser.close();

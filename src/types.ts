@@ -1,9 +1,8 @@
-// Card-deck data model (PRD §3, §7). The LLM emits `DeckContent` (10 named
-// slots); the renderer walks `CARD_ORDER` to produce the ordered 10 cards.
+// Card-deck data model (PRD §3, §7). The LLM emits `DeckContent` (named slots);
+// the renderer walks the deck's active roles to produce the ordered cards.
 //
 // Text fields may contain inline markup: "<b>…</b>" → bold emphasis, "\n" →
-// line break. Keep markup sparse (1–2 <b> per card). Wine accent is NOT driven
-// by markup — it lives on designated component slots only (PRD §2.1).
+// line break. Keep markup sparse (1–2 <b> per card).
 
 export type CardRole =
   | "cover"
@@ -18,11 +17,11 @@ export type CardRole =
   | "closing";
 
 export interface CoverContent {
-  kicker: string; // e.g. "Weekly Insight: 14 knot" — wine, Cormorant italic
+  kicker: string;
   headline: string;
 }
 export interface SummaryContent {
-  lines: string[]; // exactly 3, each short
+  lines: string[];
 }
 export interface DefinitionContent {
   term_ko: string;
@@ -30,34 +29,34 @@ export interface DefinitionContent {
   body: string;
 }
 export interface CompareSide {
-  label: string; // "하나" / "둘" — whiteFaint
-  headline: string; // the situation — white bold
-  detail: string; // one quote/aside — keep to one line
+  label: string;
+  headline: string;
+  detail: string;
 }
 export interface CompareContent {
   left: CompareSide;
   right: CompareSide;
-  common: { punch: string; sub?: string }; // the shared conclusion (punch = wine)
+  common: { punch: string; sub?: string };
 }
 export interface DiagnosisContent {
   headline: string;
-  paras: string[]; // 2 short paragraphs
+  paras: string[];
 }
 export interface AnalysisContent {
   headline: string;
-  items: string[]; // compressed list
+  items: string[];
 }
 export interface GridContent {
-  rows: [string, string][]; // [흐린 라벨, bold 결론]
+  rows: [string, string][];
 }
 export interface ClaimContent {
   headline: string;
-  emphasis?: string; // the thesis line — wine
+  emphasis?: string;
   sub?: string;
 }
 export interface ConclusionContent {
   intro: string;
-  couplet: [string, string]; // 대구 2줄
+  couplet: [string, string];
 }
 
 export interface DeckContent {
@@ -70,7 +69,6 @@ export interface DeckContent {
   grid: GridContent;
   claim: ClaimContent;
   conclusion: ConclusionContent;
-  // `closing` is a fixed card (PRD §8) — no per-issue content.
 }
 
 export interface DeckMeta {
@@ -79,6 +77,22 @@ export interface DeckMeta {
   title: string;
 }
 
+/* ── Platform size presets ────────────────────────────────────────────────── */
+export interface Platform {
+  id: string;
+  label: string;
+  w: number;
+  h: number;
+}
+export const PLATFORMS: Platform[] = [
+  { id: "ig-45", label: "Instagram 4:5", w: 1080, h: 1350 },
+  { id: "ig-11", label: "Instagram 1:1", w: 1080, h: 1080 },
+  { id: "story", label: "스토리/릴스 9:16", w: 1080, h: 1920 },
+  { id: "x-169", label: "X (트위터) 16:9", w: 1600, h: 900 },
+];
+export const DEFAULT_SIZE = { w: 1080, h: 1350 };
+
+/* ── Deck ─────────────────────────────────────────────────────────────────── */
 export interface Deck {
   meta: DeckMeta;
   content: DeckContent;
@@ -88,6 +102,20 @@ export interface Deck {
   focal?: string;
   /** Per-card dim overrides; falls back to CARD_ORDER defaults. */
   dims?: Partial<Record<CardRole, number>>;
+  /** Canvas size; default 1080×1350 (Instagram 4:5). */
+  size?: { w: number; h: number };
+  /** Korean font choice id (see FONT_CHOICES); default noto-serif. */
+  font?: string;
+  /** Global type-size multiplier (0.7–1.4); default 1. */
+  typeScale?: number;
+  /** Accent color (CSS color: hex / rgb()); default wine #C44058. */
+  accent?: string;
+  /** Brand self-reference color (closing card); default chartreuse #D6D55A. */
+  accent2?: string;
+  /** Watermark text; default "eigen knot". Empty string hides it. */
+  watermark?: string;
+  /** Ordered subset of roles to render; default = all 10. */
+  cards?: CardRole[];
 }
 
 export interface CardSpec {
@@ -96,12 +124,11 @@ export interface CardSpec {
   cardname: string;
   /** Default dim — the cinematic rhythm (PRD §2.4, Appendix B). */
   dim: number;
-  /** Body safe-area top — ONLY 180 or 200 (PRD §2.3). */
+  /** Body safe-area top at the 1350-high reference canvas — 180 or 200 only. */
   top: number;
 }
 
-// Order = swipe order = file sort order. Dim rhythm: bright open → deepen →
-// darkest at the argument → bright close.
+// Canonical order = swipe order = file sort order.
 export const CARD_ORDER: CardSpec[] = [
   { role: "cover", cardname: "cover", dim: 0.62, top: 180 },
   { role: "summary", cardname: "summary", dim: 0.9, top: 180 },
@@ -114,3 +141,15 @@ export const CARD_ORDER: CardSpec[] = [
   { role: "conclusion", cardname: "conclusion", dim: 0.9, top: 180 },
   { role: "closing", cardname: "closing", dim: 0.62, top: 180 },
 ];
+
+export const ALL_ROLES: CardRole[] = CARD_ORDER.map((s) => s.role);
+
+/** The deck's active card specs, in canonical order. */
+export function activeSpecs(deck: Deck): CardSpec[] {
+  const wanted = deck.cards?.length ? new Set(deck.cards) : null;
+  return wanted ? CARD_ORDER.filter((s) => wanted.has(s.role)) : CARD_ORDER;
+}
+
+export function deckSize(deck: Deck): { w: number; h: number } {
+  return deck.size ?? DEFAULT_SIZE;
+}
