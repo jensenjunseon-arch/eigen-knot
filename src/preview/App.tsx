@@ -4,7 +4,7 @@ import { CARD_ORDER } from "@/types";
 import { RenderCard } from "@/cards/cards";
 import { FONT_PROBES, FONT_PROBE_TEXT } from "@/design/fonts";
 import { SAMPLE_DECK } from "@/sample";
-import { OVERFLOW_LIMIT, bodyBottom } from "./shared";
+import { cardOverflow } from "./shared";
 import { Studio } from "./studio";
 
 declare global {
@@ -37,10 +37,12 @@ function CaptureView({ deck, index }: { deck: Deck; index: number }) {
       });
       await new Promise((r) => setTimeout(r, 250)); // paint settle
       if (cancelled) return;
-      const bottom = bodyBottom(ref.current);
-      const overflow = bottom > OVERFLOW_LIMIT;
-      window.__EK_OVERFLOW__ = overflow;
-      if (overflow) console.warn(`[eigen-knot] card ${index} (${CARD_ORDER[index]?.role}) overflows: body bottom ${bottom}px > ${OVERFLOW_LIMIT}px`);
+      const { v, h } = cardOverflow(ref.current);
+      window.__EK_OVERFLOW__ = v || h;
+      if (v || h)
+        console.warn(
+          `[eigen-knot] card ${index} (${CARD_ORDER[index]?.role}) overflows: ${[v && "vertical", h && "horizontal"].filter(Boolean).join("+")}`,
+        );
       window.__EK_READY__ = true;
     })();
     return () => {

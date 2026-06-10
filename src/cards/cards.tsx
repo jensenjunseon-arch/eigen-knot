@@ -181,14 +181,15 @@ function GridCard({ bg, dim, focal, c, top }: CardProps<GridContent>) {
   return (
     <CardBase bg={bg} dim={dim} focal={focal}>
       <CardBody top={top}>
-        {/* nowrap on both cells so the bold conclusions align on one X-axis (§3.2). */}
-        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 30, rowGap: 30, alignItems: "baseline" }}>
+        {/* Left labels stay nowrap so conclusions align on one X-axis (§3.2);
+            the right column wraps (keep-all) — long lines must never clip. */}
+        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 30, rowGap: 34, alignItems: "baseline" }}>
           {c.rows.map((r, i) => (
             <Fragment key={i}>
               <span className="ek-nowrap" style={{ fontSize: 34, color: EK.whiteFaint, fontWeight: 400 }}>
                 <Rich text={r[0]} />
               </span>
-              <span className="ek-nowrap" style={{ fontSize: 40, color: EK.white, fontWeight: 600 }}>
+              <span style={{ fontSize: 40, color: EK.white, fontWeight: 600, lineHeight: 1.4 }}>
                 <Rich text={r[1]} />
               </span>
             </Fragment>

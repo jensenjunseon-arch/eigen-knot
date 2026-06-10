@@ -103,6 +103,8 @@ const SYSTEM = `당신은 뉴스레터 "eigen knot"의 카드뉴스 에디터다
 - 영문 라벨 남용 금지. 영문은 cover.kicker와 definition.term_en 정도만.
 - 강조는 절제. 핵심 어구 1~2개를 <b>...</b>로 감싸되 카드당 1~2개 이내. (색 강조는 시스템이 알아서 입힌다.)
 - summary.lines는 정확히 3줄, 각 줄은 짧게. conclusion.couplet은 대구를 이루는 2줄.
+- grid.rows는 짧아야 한다: 좌측 라벨은 2~5어절, 우측 결론은 한 문장(전체 ~20자 내). 긴 설명이 필요하면 grid가 아니라 analysis.items로 보내라.
+- compare의 left/right detail은 각 1문장. 카드가 세로로 넘치면 전체가 실패한다.
 - 모든 텍스트는 한국어. 의미 단위 줄바꿈이 필요하면 \\n을 직접 넣어라(특히 헤드라인).
 
 emit_deck 도구로만 응답하라.`;

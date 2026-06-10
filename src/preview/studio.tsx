@@ -4,7 +4,7 @@ import { CARD_ORDER } from "@/types";
 import { RenderCard } from "@/cards/cards";
 import { cardFilename } from "@/lib/filename";
 import { SAMPLE_DECK } from "@/sample";
-import { OVERFLOW_LIMIT, bodyBottom } from "./shared";
+import { cardOverflow } from "./shared";
 
 /* ════════════════════════════════════════════════════════════════════════
    eigen knot — card studio (M4)
@@ -140,7 +140,8 @@ function Thumb({
   const ref = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState(false);
   useEffect(() => {
-    setOverflow(bodyBottom(ref.current) > OVERFLOW_LIMIT);
+    const { v, h } = cardOverflow(ref.current);
+    setOverflow(v || h);
   });
   const dim = deck.dims?.[spec.role] ?? spec.dim;
   return (
