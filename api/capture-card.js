@@ -9,12 +9,23 @@ import { captureCardViaUrl } from "../capture/serverless.mjs";
 // reused across warm invocations (first call pays the launch, the rest are fast).
 
 async function getBrowser() {
-  if (!globalThis.__ekBrowser) {
-    globalThis.__ekBrowser = launchBrowser().catch((e) => {
-      globalThis.__ekBrowser = undefined;
-      throw e;
-    });
+  // Reuse a warm browser across invocations ONLY if its Chromium subprocess is
+  // still alive. Lambda freezes the execution context between requests, which
+  // can kill the subprocess while this JS object survives — a zombie that fails
+  // at newContext/newPage. isConnected() detects that and forces a relaunch.
+  if (globalThis.__ekBrowser) {
+    try {
+      const b = await globalThis.__ekBrowser;
+      if (b && b.isConnected()) return b;
+    } catch {
+      /* prior launch rejected — fall through to relaunch */
+    }
+    globalThis.__ekBrowser = undefined;
   }
+  globalThis.__ekBrowser = launchBrowser().catch((e) => {
+    globalThis.__ekBrowser = undefined;
+    throw e;
+  });
   return globalThis.__ekBrowser;
 }
 
