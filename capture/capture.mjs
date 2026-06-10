@@ -84,17 +84,18 @@ function zipFiles(paths, zipPath) {
   });
 }
 
-// Debug entry: `node capture/capture.mjs <complete-deck.json>` (deck already has
-// meta + content + inlined bg). Normal use is via scripts/generate.mjs.
+// Direct entry: `node capture/capture.mjs <complete-deck.json> [outDir]` (deck
+// already has meta + content + inlined bg). Used by the studio's /api/capture;
+// normal CLI use is via scripts/generate.mjs.
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const deckPath = process.argv[2];
   if (!deckPath) {
-    console.error("usage: node capture/capture.mjs <deck.json>");
+    console.error("usage: node capture/capture.mjs <deck.json> [outDir]");
     process.exit(1);
   }
   const { readFileSync } = await import("node:fs");
   const deck = JSON.parse(readFileSync(resolve(deckPath), "utf8"));
-  const res = await captureDeck(deck, { forceBuild: true });
+  const res = await captureDeck(deck, { outDir: process.argv[3], forceBuild: true });
   console.log(`\nDone → ${res.outDir}`);
   process.exit(0);
 }
