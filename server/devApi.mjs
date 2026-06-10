@@ -1,22 +1,19 @@
-// Dev-server API for the studio UI (M4). Mounted as a Vite plugin middleware —
-// localhost only. Two endpoints:
-//   POST /api/analyze  { body, meta }        → DeckContent JSON (Claude, M3)
-//   POST /api/capture  { deck }              → runs the Playwright pipeline,
-//                                              returns { zipUrl, files, overflowAny }
-//   GET  /api/zip?issue=issue-014&file=….zip → serves the finished archive
+// Dev-server API for the studio UI. Mounted as a Vite plugin middleware —
+// localhost only. Mirrors the Vercel functions exactly (same endpoints, same
+// shapes), so the client has ONE code path for dev and prod:
+//   GET  /api/check                   → password probe
+//   POST /api/analyze { body, meta }  → { title, cards, content } (Claude)
+//   POST /api/capture-card { deck, index } → { name, b64, overflow, total }
 //
-// The capture runs in a CHILD process (node capture/capture.mjs) so a Playwright
-// crash can never take down the dev server, and the capture page always uses the
-// freshly built bundle.
+// Capture drives THIS dev server's own /?capture=1 page with a resident local
+// Playwright browser (launched once, reused) — fast per-card iterations.
 
-import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync, readFileSync, existsSync, createReadStream, statSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-// Minimal .env loader (just ANTHROPIC_API_KEY) — no dotenv dependency.
 function loadEnvKey() {
   if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY;
   const envPath = join(ROOT, ".env");
@@ -50,22 +47,38 @@ function readJsonBody(req, limitMb = 64) {
 }
 
 function sendJson(res, status, obj) {
-  const body = JSON.stringify(obj);
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
-  res.end(body);
+  res.end(JSON.stringify(obj));
 }
 
-// Mirror api/_auth.js so dev behaves like prod when STUDIO_PASSWORD is set.
 function authed(req) {
   const pw = process.env.STUDIO_PASSWORD;
   if (!pw) return true;
   return (req.headers["x-studio-password"] || "") === pw;
 }
 
+let browserPromise = null;
+async function getBrowser() {
+  if (!browserPromise) {
+    browserPromise = import("playwright")
+      .then(({ chromium }) => chromium.launch())
+      .catch((e) => {
+        browserPromise = null;
+        throw e;
+      });
+  }
+  return browserPromise;
+}
+
 export function devApi() {
   return {
     name: "ek-dev-api",
     configureServer(server) {
+      server.httpServer?.on("close", async () => {
+        const b = await browserPromise?.catch(() => null);
+        await b?.close().catch(() => {});
+      });
+
       server.middlewares.use(async (req, res, next) => {
         const url = new URL(req.url, "http://localhost");
 
@@ -82,87 +95,43 @@ export function devApi() {
             const key = loadEnvKey();
             if (!key) {
               return sendJson(res, 400, {
-                error:
-                  "ANTHROPIC_API_KEY가 없습니다. 프로젝트 루트의 .env에 ANTHROPIC_API_KEY=sk-ant-... 를 추가하세요.",
+                error: "ANTHROPIC_API_KEY가 없습니다. 프로젝트 루트의 .env에 추가하세요.",
               });
             }
             process.env.ANTHROPIC_API_KEY = key;
             const { body, meta, model } = await readJsonBody(req, 4);
             if (!body?.trim()) return sendJson(res, 400, { error: "본문이 비어 있습니다." });
             const { analyzeArticle } = await import("../content/analyze.mjs");
-            const content = await analyzeArticle(body, meta, { model: model || "sonnet" });
-            return sendJson(res, 200, { content });
+            const result = await analyzeArticle(body, meta, { model: model || "sonnet" });
+            return sendJson(res, 200, result); // { title, cards, content }
           } catch (e) {
             return sendJson(res, 500, { error: String(e?.message ?? e) });
           }
         }
 
-        /* ── capture ─────────────────────────────────────────────── */
-        if (req.method === "POST" && url.pathname === "/api/capture") {
+        /* ── capture one card ────────────────────────────────────── */
+        if (req.method === "POST" && url.pathname === "/api/capture-card") {
           try {
             if (!authed(req)) return sendJson(res, 401, { error: "비밀번호가 필요합니다." });
-            const { deck } = await readJsonBody(req, 64);
-            if (!deck?.meta?.issue || !deck?.meta?.slug)
-              return sendJson(res, 400, { error: "deck.meta.issue / slug가 필요합니다." });
+            const { deck, index } = await readJsonBody(req, 64);
+            if (!deck?.meta?.slug || !Number.isInteger(index))
+              return sendJson(res, 400, { error: "deck과 index가 필요합니다." });
             if (!deck.bg?.startsWith("data:"))
               return sendJson(res, 400, { error: "배경 이미지를 먼저 업로드하세요." });
 
-            const issueDir = `issue-${String(deck.meta.issue).padStart(3, "0")}`;
-            const outDir = join(ROOT, "output", issueDir);
-            mkdirSync(outDir, { recursive: true });
-            // Clear stale outputs — re-exports with fewer cards or a different
-            // numbering must not leave orphan files from the previous run.
-            for (const f of readdirSync(outDir)) {
-              if (f.endsWith(".png") || f.endsWith(".zip")) rmSync(join(outDir, f), { force: true });
-            }
-            const tmpDeck = join(outDir, ".studio-deck.json");
-            writeFileSync(tmpDeck, JSON.stringify(deck));
-
-            const log = [];
-            const code = await new Promise((done) => {
-              const child = spawn(process.execPath, [join(ROOT, "capture/capture.mjs"), tmpDeck, outDir], {
-                cwd: ROOT,
-                stdio: ["ignore", "pipe", "pipe"],
-              });
-              child.stdout.on("data", (d) => log.push(d.toString()));
-              child.stderr.on("data", (d) => log.push(d.toString()));
-              child.on("close", done);
-            });
-            const text = log.join("");
-            if (code !== 0) return sendJson(res, 500, { error: "capture 실패", log: text });
-
-            const zipFile = (text.match(/✓ (eigen-knot-[a-z0-9-]+\.zip)/) || [])[1] ?? null;
-            const zipPath = zipFile ? join(outDir, zipFile) : null;
-            const zipB64 = zipPath && existsSync(zipPath) ? readFileSync(zipPath).toString("base64") : null;
+            const { captureCardViaUrl } = await import("../capture/serverless.mjs");
+            const browser = await getBrowser();
+            const host = req.headers.host ?? "localhost:5173";
+            const card = await captureCardViaUrl(deck, index, { browser, baseUrl: `http://${host}` });
             return sendJson(res, 200, {
-              ok: true,
-              overflowAny: text.includes("⚠"),
-              files: [...text.matchAll(/✓ (\S+\.png)/g)].map((m) => m[1]),
-              zipB64,
-              zipName: zipFile,
-              log: text,
+              name: card.name,
+              b64: card.buffer.toString("base64"),
+              overflow: card.overflow,
+              total: card.total,
             });
           } catch (e) {
             return sendJson(res, 500, { error: String(e?.message ?? e) });
           }
-        }
-
-        /* ── zip download ────────────────────────────────────────── */
-        if (req.method === "GET" && url.pathname === "/api/zip") {
-          const issue = url.searchParams.get("issue") ?? "";
-          const file = url.searchParams.get("file") ?? "";
-          // Strict allow-list — these land in a Content-Disposition filename.
-          if (!/^issue-\d{3}$/.test(issue) || !/^[a-z0-9.-]+\.zip$/.test(file)) {
-            return sendJson(res, 400, { error: "bad params" });
-          }
-          const p = join(ROOT, "output", issue, file);
-          if (!existsSync(p)) return sendJson(res, 404, { error: "not found" });
-          res.writeHead(200, {
-            "content-type": "application/zip",
-            "content-length": statSync(p).size,
-            "content-disposition": `attachment; filename="${file}"`,
-          });
-          return createReadStream(p).pipe(res);
         }
 
         next();

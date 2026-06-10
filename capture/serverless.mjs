@@ -9,6 +9,35 @@
 
 import { ROLE_CARDNAMES, deckRoles, deckCanvas, cardFilename } from "../scripts/shared.mjs";
 
+/** Capture ONE card (by index into the deck's active roles). Used by the
+ *  per-card API route — each invocation stays well under serverless duration
+ *  and response-size limits, and the browser is reused across warm calls. */
+export async function captureCardViaUrl(deck, index, { browser, baseUrl, scale = 1 }) {
+  const base = baseUrl.replace(/\/$/, "");
+  const { w, h } = deckCanvas(deck);
+  const roles = deckRoles(deck);
+  const i = Math.min(Math.max(index, 0), roles.length - 1);
+  const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: scale });
+  await ctx.addInitScript((d) => {
+    window.__EK_DECK__ = d;
+  }, deck);
+  try {
+    const page = await ctx.newPage();
+    await page.goto(`${base}/?capture=1&i=${i}`, { waitUntil: "load", timeout: 30000 });
+    await page.waitForFunction(() => window.__EK_READY__ === true, undefined, { timeout: 25000 });
+    const overflow = await page.evaluate(() => window.__EK_OVERFLOW__ === true);
+    const buffer = await page.locator(".ek-card").screenshot({ type: "png" });
+    return {
+      name: cardFilename(i + 1, deck.meta.slug, deck.meta.issue, ROLE_CARDNAMES[roles[i]]),
+      buffer,
+      overflow,
+      total: roles.length,
+    };
+  } finally {
+    await ctx.close();
+  }
+}
+
 export async function captureDeckViaUrl(deck, { browser, baseUrl, scale = 1 }) {
   const base = baseUrl.replace(/\/$/, "");
   const { w, h } = deckCanvas(deck);

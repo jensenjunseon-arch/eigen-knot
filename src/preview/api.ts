@@ -58,12 +58,9 @@ export function imageToBg(file: File, maxPx = 1440, quality = 0.82): Promise<str
   });
 }
 
-export function downloadBase64(b64: string, filename: string, mime = "application/zip"): void {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+export function downloadBlob(blob: Blob, filename: string): void {
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([bytes], { type: mime }));
+  a.href = URL.createObjectURL(blob);
   a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);

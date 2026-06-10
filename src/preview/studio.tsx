@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import JSZip from "jszip";
 import type { CardRole, Deck, DeckContent } from "@/types";
 import { CARD_ORDER, ALL_ROLES, PLATFORMS, activeSpecs, deckSize } from "@/types";
 import { RenderCard } from "@/cards/cards";
-import { cardFilename } from "@/lib/filename";
+import { zipName } from "@/lib/filename";
 import { FONT_CHOICES, DEFAULT_FONT_ID } from "@/design/fonts";
 import { SAMPLE_DECK } from "@/sample";
 import { cardOverflow } from "./shared";
-import { apiFetch, checkPassword, getPw, savePw, imageToBg, downloadBase64 } from "./api";
+import { apiFetch, checkPassword, getPw, savePw, imageToBg, downloadBlob } from "./api";
 
 /* ════════════════════════════════════════════════════════════════════════
-   eigen knot — card studio 2.0
-   인트로(글 입력) → 스튜디오(상세 편집). 덱은 localStorage에 자동 저장.
+   eigen knot — card studio
+   인트로(글 입력 → AI가 제목·구성·장수까지 결정) → 스튜디오(상세 조정).
+   덱은 브라우저(localStorage)에 자동 저장된다.
    ════════════════════════════════════════════════════════════════════════ */
 
 const STORE_KEY = "ek-studio-v1";
@@ -51,13 +53,14 @@ const FIELD_LABELS: Record<string, string> = {
   emphasis: "강조 문장 (강조색)",
 };
 
+// 모던 강조색 팔레트 (다크 사진 위에서 또렷한 톤).
 const ACCENT_PRESETS = [
-  { label: "와인", value: "#C44058" },
-  { label: "플럼", value: "#8E4585" },
-  { label: "네이비", value: "#3D6B9E" },
-  { label: "포레스트", value: "#3F7249" },
-  { label: "오커", value: "#C98A2B" },
-  { label: "코랄", value: "#E2725B" },
+  { label: "로즈", value: "#FB7185" },
+  { label: "바이올렛", value: "#A78BFA" },
+  { label: "스카이", value: "#38BDF8" },
+  { label: "에메랄드", value: "#34D399" },
+  { label: "앰버", value: "#FBBF24" },
+  { label: "와인 (클래식)", value: "#C44058" },
 ];
 
 type Path = (string | number)[];
@@ -157,103 +160,102 @@ function Thumb({
           width,
           height: Math.round(h * scale),
           overflow: "hidden",
-          borderRadius: 8,
-          outline: selected ? `3px solid ${deck.accent ?? "#C44058"}` : "1px solid rgba(255,255,255,0.12)",
-          boxShadow: "0 14px 30px -18px rgba(0,0,0,.8)",
+          borderRadius: 14,
+          outline: selected ? "2px solid #4E86FF" : "1px solid rgba(255,255,255,0.08)",
+          boxShadow: selected ? "0 0 0 4px rgba(78,134,255,0.18), 0 16px 36px -20px rgba(0,0,0,.8)" : "0 14px 30px -18px rgba(0,0,0,.7)",
+          transition: "outline .12s ease, box-shadow .12s ease",
         }}
       >
         <div ref={ref} style={{ width: w, height: h, transform: `scale(${scale})`, transformOrigin: "top left" }}>
           <RenderCard deck={deck} spec={spec} />
         </div>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11, color: "#9a97a8", fontFamily: "ui-monospace, monospace" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11.5, color: "#9AA0A6" }}>
         <span>
           {String(index + 1).padStart(2, "0")} {ROLE_LABELS[spec.role]} · dim {dim.toFixed(2)}
         </span>
-        {overflow && <span style={{ color: "#ff6b6b" }}>⚠ 넘침</span>}
+        {overflow && <span style={{ color: "#F28B82" }}>⚠ 넘침</span>}
       </div>
     </div>
   );
 }
 
-/* ── 인트로 화면: AI 플랫폼식 입력 ──────────────────────────────────────── */
+/* ── 인트로: 글만 던지면 AI가 전부 결정 ─────────────────────────────────── */
 function Intro({
   hasSaved,
   onContinue,
   onAI,
   onSample,
-  onLoad,
   busy,
   notice,
 }: {
   hasSaved: boolean;
   onContinue: () => void;
-  onAI: (article: string, title: string, issue: number) => void;
+  onAI: (article: string) => void;
   onSample: () => void;
-  onLoad: (f: File) => void;
   busy: boolean;
   notice: string | null;
 }) {
   const [article, setArticle] = useState("");
-  const [title, setTitle] = useState("");
-  const [issue, setIssue] = useState(1);
+  const ready = article.trim().length > 0 && !busy;
   return (
     <div style={ui.introRoot}>
       <div style={ui.introCol}>
-        <div style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "#C44058", fontSize: 34, textAlign: "center" }}>
-          eigen knot
-        </div>
-        <div style={{ color: "#8e8b9c", fontSize: 15, textAlign: "center", margin: "10px 0 34px" }}>
-          글 한 편이 카드뉴스가 됩니다 — 붙여넣고, 다듬고, 내보내세요.
+        <div style={ui.gradientTitle}>무엇을 카드뉴스로 만들까요?</div>
+        <div style={{ color: "#9AA0A6", fontSize: 15, textAlign: "center", margin: "12px 0 30px" }}>
+          글을 붙여넣으면 AI가 제목, 카드 구성, 장수까지 알아서 정합니다.
         </div>
 
         <div style={ui.introBox}>
           <textarea
             style={ui.introTextarea}
-            placeholder={"뉴스레터 본문이나 쓰고 싶은 글을 여기에 붙여넣으세요…\n\nAI가 표지·요약·대비 장면·결론까지 카드 초안을 만들어 드립니다."}
+            placeholder="뉴스레터 본문이나 쓰고 싶은 글을 여기에 붙여넣으세요…"
             value={article}
             onChange={(e) => setArticle(e.target.value)}
           />
-          <div style={{ display: "flex", gap: 10, padding: "0 14px 14px", flexWrap: "wrap" }}>
-            <input
-              style={{ ...ui.input, flex: "1 1 220px" }}
-              placeholder="제목 (예: 뉴스레터를 시작한 이유)"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-            <input
-              style={{ ...ui.input, width: 110, flex: "none" }}
-              type="number"
-              min={1}
-              value={issue}
-              onChange={(e) => setIssue(Number(e.target.value) || 1)}
-              title="호 번호"
-            />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px 12px" }}>
+            <span style={{ fontSize: 12, color: "#6E727A" }}>
+              {busy ? "AI가 글을 읽고 카드 구성을 설계하는 중…" : "붙여넣은 뒤 → 버튼"}
+            </span>
             <button
-              style={{ ...ui.primaryBtn, flex: "none", opacity: busy || !article.trim() ? 0.55 : 1 }}
-              disabled={busy || !article.trim()}
-              onClick={() => onAI(article, title, issue)}
+              title="AI로 카드 만들기"
+              disabled={!ready}
+              onClick={() => onAI(article)}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                border: "none",
+                cursor: ready ? "pointer" : "default",
+                background: ready ? "linear-gradient(135deg,#4E86FF,#9B72F8)" : "#2A2B31",
+                color: ready ? "#fff" : "#6E727A",
+                fontSize: 18,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "background .15s ease",
+              }}
             >
-              {busy ? "AI가 카드를 만드는 중…" : "AI로 카드 만들기 →"}
+              {busy ? "…" : "↑"}
             </button>
           </div>
         </div>
 
-        {notice && <div style={{ color: notice.startsWith("✗") ? "#ff6b6b" : "#b9e2b4", fontSize: 13, textAlign: "center", marginTop: 14 }}>{notice}</div>}
+        {notice && (
+          <div style={{ color: notice.startsWith("✗") ? "#F28B82" : "#81C995", fontSize: 13, textAlign: "center", marginTop: 14 }}>
+            {notice}
+          </div>
+        )}
 
-        <div style={{ display: "flex", gap: 14, justifyContent: "center", marginTop: 22, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 26, flexWrap: "wrap" }}>
           {hasSaved && (
-            <button style={ui.ghostBtn} onClick={onContinue}>
+            <button style={ui.chipLg} onClick={onContinue}>
               ↩ 이어서 편집
             </button>
           )}
-          <button style={ui.ghostBtn} onClick={onSample}>
-            샘플 틀로 시작 (AI 없이)
+          <button style={ui.chipLg} onClick={onSample}>
+            샘플로 둘러보기
           </button>
-          <label style={{ ...ui.ghostBtn, display: "inline-block" }}>
-            deck.json 불러오기
-            <input type="file" accept="application/json" hidden onChange={(e) => e.target.files?.[0] && onLoad(e.target.files[0])} />
-          </label>
         </div>
       </div>
     </div>
@@ -278,6 +280,7 @@ export function Studio() {
   const [sel, setSel] = useState(0);
   const [article, setArticle] = useState("");
   const [busy, setBusy] = useState<null | "ai" | "export">(null);
+  const [prog, setProg] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [checked, setChecked] = useState(false);
@@ -308,28 +311,38 @@ export function Studio() {
 
   const setContent = (path: Path, v: unknown) =>
     setDeck((d) => (d ? { ...d, content: setAtPath(d.content, path, v) } : d));
-
   const patch = (p: Partial<Deck>) => setDeck((d) => (d ? { ...d, ...p } : d));
 
-  /* AI 초안 (인트로/스튜디오 공용) */
-  const runAI = async (text: string, title?: string, issue?: number) => {
+  /* AI — 인트로: 새 호 생성(제목·구성 자동) / 스튜디오: 내용 재작성 */
+  const runAI = async (text: string, fresh: boolean) => {
     if (!text.trim()) return;
     setBusy("ai");
     setNotice(null);
+    const issue = fresh ? (deck?.meta.issue ?? 0) + 1 || 1 : (deck?.meta.issue ?? 1);
     const meta = {
-      issue: issue ?? deck?.meta.issue ?? 1,
-      slug: deck?.meta.slug || `knot-${String(issue ?? 1).padStart(3, "0")}`,
-      title: title || deck?.meta.title || "",
+      issue,
+      slug: fresh || !deck?.meta.slug ? `knot-${String(issue).padStart(3, "0")}` : deck.meta.slug,
+      title: fresh ? "" : (deck?.meta.title ?? ""),
     };
     try {
-      const j = await apiFetch<{ content: DeckContent }>("/api/analyze", { body: text, meta });
+      const j = await apiFetch<{ title: string; cards: CardRole[]; content: DeckContent }>("/api/analyze", {
+        body: text,
+        meta,
+      });
       const content: DeckContent = {
         ...j.content,
         cover: { ...j.content.cover, kicker: `Weekly Insight: ${meta.issue} knot` },
       };
-      setDeck((d) => ({ ...(d ?? SAMPLE_DECK), meta, content, bg: d?.bg ?? SAMPLE_DECK.bg }));
+      setDeck((d) => ({
+        ...(d ?? SAMPLE_DECK),
+        meta: { ...meta, title: j.title || meta.title },
+        content,
+        cards: j.cards,
+        bg: d?.bg ?? SAMPLE_DECK.bg,
+      }));
+      setSel(0);
       setPhase("studio");
-      setNotice("✓ AI 초안 완성 — 카드를 눌러 다듬어 주세요.");
+      setNotice(`✓ ${j.cards.length}장 구성 완료 — 카드를 눌러 다듬어 주세요.`);
     } catch (e) {
       setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -337,47 +350,34 @@ export function Studio() {
     }
   };
 
-  /* PNG 내보내기 */
+  /* PNG 내보내기 — 카드 1장씩 캡처 후 브라우저에서 ZIP 조립 */
   const runExport = async () => {
     if (!deck) return;
     setBusy("export");
     setNotice(null);
     try {
-      const j = await apiFetch<{ zipB64: string; zipName: string; overflowAny: boolean }>("/api/capture", { deck });
-      downloadBase64(j.zipB64, j.zipName);
-      setNotice(j.overflowAny ? "⚠ 일부 카드가 넘쳤습니다 — ⚠ 표시 카드를 다듬어 주세요." : "✓ ZIP 다운로드 완료");
+      const n = specs.length;
+      const zip = new JSZip();
+      let anyOverflow = false;
+      for (let i = 0; i < n; i++) {
+        setProg(`${i + 1}/${n}`);
+        const card = await apiFetch<{ name: string; b64: string; overflow: boolean }>("/api/capture-card", {
+          deck,
+          index: i,
+        });
+        zip.file(card.name, card.b64, { base64: true });
+        if (card.overflow) anyOverflow = true;
+      }
+      setProg("zip…");
+      const blob = await zip.generateAsync({ type: "blob" });
+      downloadBlob(blob, zipName(deck.meta.slug, deck.meta.issue));
+      setNotice(anyOverflow ? "⚠ 일부 카드가 넘쳤습니다 — ⚠ 표시 카드를 다듬어 주세요." : `✓ PNG ${n}장 다운로드 완료`);
     } catch (e) {
       setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(null);
+      setProg("");
     }
-  };
-
-  /* deck.json 저장/불러오기 */
-  const saveJson = () => {
-    if (!deck) return;
-    const blob = new Blob([JSON.stringify({ ...deck, bg: undefined }, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `deck-issue-${String(deck.meta.issue).padStart(3, "0")}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-  const loadJson = (file: File) => {
-    file.text().then((t) => {
-      try {
-        const j = JSON.parse(t);
-        if (j.content && j.meta) {
-          setDeck((d) => ({ ...j, bg: d?.bg?.startsWith("data:") ? d.bg : SAMPLE_DECK.bg }));
-        } else if (j.cover) {
-          setDeck((d) => ({ ...(d ?? SAMPLE_DECK), content: j }));
-        } else throw new Error("bad json");
-        setPhase("studio");
-        setNotice("✓ 덱 불러옴");
-      } catch {
-        setNotice("✗ deck.json 형식이 아닙니다");
-      }
-    });
   };
 
   const onUpload = (file: File) => {
@@ -389,18 +389,16 @@ export function Studio() {
   if (!checked) return null;
   if (!unlocked) return <LoginGate onUnlock={() => setUnlocked(true)} />;
 
-  /* ── 인트로 ── */
   if (phase === "intro") {
     return (
       <Intro
         hasSaved={!!deck}
         onContinue={() => setPhase("studio")}
-        onAI={(text, title, issue) => void runAI(text, title, issue)}
+        onAI={(text) => void runAI(text, true)}
         onSample={() => {
           setDeck((d) => d ?? SAMPLE_DECK);
           setPhase("studio");
         }}
-        onLoad={loadJson}
         busy={busy === "ai"}
         notice={notice}
       />
@@ -417,29 +415,20 @@ export function Studio() {
   const selDim = deck.dims?.[spec.role] ?? spec.dim;
   const accent = deck.accent ?? "#C44058";
 
-  /* ── 스튜디오 ── */
   return (
     <div style={ui.root}>
       <header style={ui.topbar}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <button style={ui.ghostBtn} onClick={() => setPhase("intro")} title="처음 화면으로">
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button style={ui.iconPill} onClick={() => setPhase("intro")} title="처음 화면으로">
             ←
           </button>
-          <div style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "#C44058", fontSize: 17 }}>
-            eigen knot <span style={{ color: "#8e8b9c", fontStyle: "normal", fontSize: 13 }}>card studio</span>
-          </div>
+          <span style={{ ...ui.gradientText, fontSize: 16, fontWeight: 600 }}>eigen knot</span>
+          <span style={{ color: "#6E727A", fontSize: 12.5 }}>card studio</span>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {notice && <span style={{ fontSize: 12.5, color: notice.startsWith("✗") ? "#ff6b6b" : "#b9e2b4", marginRight: 8 }}>{notice}</span>}
-          <button style={ui.ghostBtn} onClick={saveJson}>
-            deck.json 저장
-          </button>
-          <label style={{ ...ui.ghostBtn, display: "inline-block" }}>
-            불러오기
-            <input type="file" accept="application/json" hidden onChange={(e) => e.target.files?.[0] && loadJson(e.target.files[0])} />
-          </label>
-          <button style={{ ...ui.primaryBtn, opacity: busy ? 0.6 : 1 }} disabled={busy !== null} onClick={runExport}>
-            {busy === "export" ? "내보내는 중… (~20초)" : `PNG ${specs.length}장 내보내기`}
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          {notice && <span style={{ fontSize: 12.5, color: notice.startsWith("✗") ? "#F28B82" : "#81C995" }}>{notice}</span>}
+          <button style={{ ...ui.primaryPill, opacity: busy ? 0.6 : 1 }} disabled={busy !== null} onClick={runExport}>
+            {busy === "export" ? `내보내는 중 ${prog}` : `PNG ${specs.length}장 내보내기`}
           </button>
         </div>
       </header>
@@ -447,8 +436,7 @@ export function Studio() {
       <div style={ui.cols}>
         {/* ── 좌측 패널 ── */}
         <aside style={ui.side}>
-          {/* 선택 카드 편집 — 가장 자주 쓰므로 맨 위 */}
-          <Section title={`카드 편집 — ${String(selIdx + 1).padStart(2, "0")} ${ROLE_LABELS[spec.role]}`} defaultOpen>
+          <Panel title={`카드 편집 — ${String(selIdx + 1).padStart(2, "0")} ${ROLE_LABELS[spec.role]}`} defaultOpen>
             <Row label={`이 카드 dim · ${selDim.toFixed(2)}`}>
               <input
                 type="range"
@@ -456,27 +444,22 @@ export function Studio() {
                 max={0.94}
                 step={0.01}
                 value={selDim}
-                style={{ width: "100%" }}
+                style={ui.range}
                 onChange={(e) => patch({ dims: { ...deck.dims, [spec.role]: Number(e.target.value) } })}
               />
             </Row>
             {spec.role === "closing" ? (
-              <div style={{ fontSize: 12.5, color: "#8e8b9c", lineHeight: 1.6 }}>
+              <div style={{ fontSize: 12.5, color: "#9AA0A6", lineHeight: 1.6 }}>
                 끝맺음 카드는 고정 문구입니다 (워터마크 문구는 ‘디자인’에서 변경).
               </div>
             ) : (
               <FieldEditor value={deck.content[spec.role as keyof DeckContent]} path={[spec.role]} onSet={setContent} />
             )}
-          </Section>
+          </Panel>
 
-          {/* 디자인 */}
-          <Section title="디자인" defaultOpen>
+          <Panel title="디자인" defaultOpen>
             <Row label="폰트">
-              <select
-                style={ui.input}
-                value={deck.font ?? DEFAULT_FONT_ID}
-                onChange={(e) => patch({ font: e.target.value })}
-              >
+              <select style={ui.input} value={deck.font ?? DEFAULT_FONT_ID} onChange={(e) => patch({ font: e.target.value })}>
                 {FONT_CHOICES.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.label}
@@ -491,23 +474,25 @@ export function Studio() {
                 max={1.4}
                 step={0.02}
                 value={deck.typeScale ?? 1}
-                style={{ width: "100%" }}
+                style={ui.range}
                 onChange={(e) => patch({ typeScale: Number(e.target.value) })}
               />
             </Row>
             <Row label="강조색">
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                 {ACCENT_PRESETS.map((p) => (
                   <button
                     key={p.value}
                     title={p.label}
                     onClick={() => patch({ accent: p.value })}
                     style={{
-                      width: 26,
-                      height: 26,
+                      width: 28,
+                      height: 28,
                       borderRadius: "50%",
                       background: p.value,
-                      border: accent.toLowerCase() === p.value.toLowerCase() ? "2px solid #fff" : "2px solid transparent",
+                      border: "none",
+                      outline: accent.toLowerCase() === p.value.toLowerCase() ? "2px solid #fff" : "2px solid transparent",
+                      outlineOffset: 2,
                       cursor: "pointer",
                     }}
                   />
@@ -516,24 +501,15 @@ export function Studio() {
               <input
                 style={ui.input}
                 value={deck.accent ?? "#C44058"}
-                placeholder="#C44058 또는 rgb(196,64,88)"
+                placeholder="#FB7185 또는 rgb(251,113,133)"
                 onChange={(e) => patch({ accent: e.target.value })}
               />
             </Row>
             <Row label="브랜드색 (끝맺음 카드)">
-              <input
-                style={ui.input}
-                value={deck.accent2 ?? "#D6D55A"}
-                placeholder="#D6D55A"
-                onChange={(e) => patch({ accent2: e.target.value })}
-              />
+              <input style={ui.input} value={deck.accent2 ?? "#D6D55A"} onChange={(e) => patch({ accent2: e.target.value })} />
             </Row>
             <Row label="워터마크 문구 (비우면 숨김)">
-              <input
-                style={ui.input}
-                value={deck.watermark ?? "eigen knot"}
-                onChange={(e) => patch({ watermark: e.target.value })}
-              />
+              <input style={ui.input} value={deck.watermark ?? "eigen knot"} onChange={(e) => patch({ watermark: e.target.value })} />
             </Row>
             <Row label="플랫폼 사이즈">
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -542,7 +518,10 @@ export function Studio() {
                   return (
                     <button
                       key={p.id}
-                      style={{ ...ui.chipBtn, ...(active ? { background: "#C44058", color: "#fff", borderColor: "#C44058" } : {}) }}
+                      style={{
+                        ...ui.chip,
+                        ...(active ? { background: "#4E86FF", color: "#fff", borderColor: "transparent" } : {}),
+                      }}
                       onClick={() => patch({ size: { w: p.w, h: p.h } })}
                     >
                       {p.label}
@@ -550,15 +529,14 @@ export function Studio() {
                   );
                 })}
               </div>
-              <div style={{ fontSize: 11, color: "#6f6c7d", marginTop: 6 }}>
+              <div style={{ fontSize: 11, color: "#6E727A", marginTop: 6 }}>
                 현재 {w}×{h}px — 사이즈를 바꾸면 ⚠ 넘침 표시를 확인하세요.
               </div>
             </Row>
-          </Section>
+          </Panel>
 
-          {/* 배경 */}
-          <Section title="배경 사진">
-            <label style={{ ...ui.primaryBtn, display: "block", textAlign: "center" }}>
+          <Panel title="배경 사진">
+            <label style={{ ...ui.primaryPill, display: "block", textAlign: "center" }}>
               이미지 업로드 (jpg/png)
               <input type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
             </label>
@@ -567,7 +545,7 @@ export function Studio() {
             </Row>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {["center", "center 25%", "center 35%", "center 50%"].map((f) => (
-                <button key={f} style={ui.chipBtn} onClick={() => patch({ focal: f })}>
+                <button key={f} style={ui.chip} onClick={() => patch({ focal: f })}>
                   {f}
                 </button>
               ))}
@@ -579,29 +557,31 @@ export function Studio() {
                 max={0.94}
                 step={0.01}
                 value={bodyDim}
-                style={{ width: "100%" }}
+                style={ui.range}
                 onChange={(e) => {
                   const v = Number(e.target.value);
                   patch({ dims: { ...deck.dims, ...Object.fromEntries(BODY_ROLES.map((r) => [r, v])) } });
                 }}
               />
             </Row>
-          </Section>
+          </Panel>
 
-          {/* 카드 구성 */}
-          <Section title={`카드 구성 · ${specs.length}장`}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <Panel title={`카드 구성 · ${specs.length}장`}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               {CARD_ORDER.map((s) => {
                 const current = deck.cards?.length ? deck.cards : ALL_ROLES;
                 const on = current.includes(s.role);
                 return (
-                  <label key={s.role} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer", color: on ? "#e8e6f0" : "#6f6c7d" }}>
+                  <label
+                    key={s.role}
+                    style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer", color: on ? "#E3E3E8" : "#6E727A" }}
+                  >
                     <input
                       type="checkbox"
                       checked={on}
                       onChange={() => {
                         const next = on ? current.filter((r) => r !== s.role) : ALL_ROLES.filter((r) => current.includes(r) || r === s.role);
-                        if (next.length === 0) return; // 최소 1장
+                        if (next.length === 0) return;
                         patch({ cards: next });
                         setSel(0);
                       }}
@@ -611,11 +591,10 @@ export function Studio() {
                 );
               })}
             </div>
-            <div style={{ fontSize: 11, color: "#6f6c7d" }}>해제한 카드는 내보내기에서 빠집니다. 파일 번호는 자동으로 당겨집니다.</div>
-          </Section>
+            <div style={{ fontSize: 11, color: "#6E727A" }}>해제한 카드는 내보내기에서 빠지고, 파일 번호는 자동으로 당겨집니다.</div>
+          </Panel>
 
-          {/* 호 정보 */}
-          <Section title="호 정보">
+          <Panel title="호 정보">
             <Row label="호 번호">
               <input
                 style={ui.input}
@@ -624,30 +603,29 @@ export function Studio() {
                 onChange={(e) => patch({ meta: { ...deck.meta, issue: Number(e.target.value) || 0 } })}
               />
             </Row>
-            <Row label="슬러그 (영문 kebab)">
+            <Row label="슬러그 (영문 kebab — 파일명용)">
               <input style={ui.input} value={deck.meta.slug} onChange={(e) => patch({ meta: { ...deck.meta, slug: e.target.value } })} />
             </Row>
             <Row label="제목">
               <input style={ui.input} value={deck.meta.title} onChange={(e) => patch({ meta: { ...deck.meta, title: e.target.value } })} />
             </Row>
-          </Section>
+          </Panel>
 
-          {/* 글 → AI 재생성 */}
-          <Section title="글 → AI 초안 다시 만들기">
+          <Panel title="글 → AI 다시 구성">
             <textarea
               style={{ ...ui.textarea, minHeight: 90 }}
-              placeholder="본문을 붙여넣고 누르면 카드 내용을 새로 작성합니다 (현재 편집 내용은 덮어씌워짐)."
+              placeholder="본문을 붙여넣고 누르면 카드 내용과 구성을 새로 만듭니다 (현재 편집 내용은 덮어씌워짐)."
               value={article}
               onChange={(e) => setArticle(e.target.value)}
             />
             <button
-              style={{ ...ui.primaryBtn, width: "100%", opacity: busy || !article.trim() ? 0.55 : 1 }}
+              style={{ ...ui.primaryPill, width: "100%", opacity: busy || !article.trim() ? 0.55 : 1 }}
               disabled={busy !== null || !article.trim()}
-              onClick={() => void runAI(article)}
+              onClick={() => void runAI(article, false)}
             >
-              {busy === "ai" ? "분석 중…" : "AI 초안 만들기"}
+              {busy === "ai" ? "분석 중…" : "AI로 다시 구성"}
             </button>
-          </Section>
+          </Panel>
         </aside>
 
         {/* ── 카드 그리드 ── */}
@@ -656,9 +634,6 @@ export function Studio() {
             {specs.map((s, i) => (
               <Thumb key={s.role} deck={deck} index={i} selected={i === selIdx} onSelect={() => setSel(i)} width={248} />
             ))}
-          </div>
-          <div style={{ marginTop: 18, fontSize: 11.5, color: "#6f6c7d", fontFamily: "ui-monospace, monospace" }}>
-            {cardFilename(1, deck.meta.slug, deck.meta.issue, specs[0].cardname)} …
           </div>
         </main>
       </div>
@@ -686,8 +661,8 @@ function LoginGate({ onUnlock }: { onUnlock: () => void }) {
   return (
     <div style={ui.gate}>
       <div style={ui.gateCard}>
-        <div style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "#C44058", fontSize: 22 }}>eigen knot</div>
-        <div style={{ color: "#8e8b9c", fontSize: 13, margin: "6px 0 20px" }}>card studio — 비밀번호를 입력하세요</div>
+        <div style={{ ...ui.gradientText, fontSize: 24, fontWeight: 600 }}>eigen knot</div>
+        <div style={{ color: "#9AA0A6", fontSize: 13, margin: "8px 0 22px" }}>비밀번호를 입력하세요</div>
         <input
           type="password"
           autoFocus
@@ -697,8 +672,8 @@ function LoginGate({ onUnlock }: { onUnlock: () => void }) {
           style={{ ...ui.input, marginBottom: 12 }}
           placeholder="비밀번호"
         />
-        {err && <div style={{ color: "#ff6b6b", fontSize: 12.5, marginBottom: 10 }}>{err}</div>}
-        <button style={{ ...ui.primaryBtn, width: "100%", opacity: busy ? 0.6 : 1 }} disabled={busy} onClick={submit}>
+        {err && <div style={{ color: "#F28B82", fontSize: 12.5, marginBottom: 10 }}>{err}</div>}
+        <button style={{ ...ui.primaryPill, width: "100%", opacity: busy ? 0.6 : 1 }} disabled={busy} onClick={submit}>
           {busy ? "확인 중…" : "들어가기"}
         </button>
       </div>
@@ -706,32 +681,16 @@ function LoginGate({ onUnlock }: { onUnlock: () => void }) {
   );
 }
 
-/* ── 접이식 섹션 ────────────────────────────────────────────────────────── */
-function Section({ title, children, defaultOpen = false }: { title: string; children: ReactNode; defaultOpen?: boolean }) {
+/* ── 패널/행 ────────────────────────────────────────────────────────────── */
+function Panel({ title, children, defaultOpen = false }: { title: string; children: ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 12, marginTop: 12 }}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        style={{
-          width: "100%",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          background: "transparent",
-          border: "none",
-          padding: "2px 0 10px",
-          cursor: "pointer",
-          fontSize: 12,
-          letterSpacing: "0.08em",
-          color: "#C44058",
-          fontWeight: 600,
-        }}
-      >
-        {title}
-        <span style={{ color: "#6f6c7d", fontSize: 11 }}>{open ? "▾" : "▸"}</span>
+    <section style={ui.panel}>
+      <button onClick={() => setOpen((o) => !o)} style={ui.panelHead}>
+        <span>{title}</span>
+        <span style={{ color: "#6E727A", fontSize: 11 }}>{open ? "▾" : "▸"}</span>
       </button>
-      {open && <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{children}</div>}
+      {open && <div style={{ display: "flex", flexDirection: "column", gap: 11, padding: "2px 14px 14px" }}>{children}</div>}
     </section>
   );
 }
@@ -744,24 +703,44 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/* ── Gemini풍 다크 UI 토큰 ──────────────────────────────────────────────── */
+const GRADIENT = "linear-gradient(90deg,#4E86FF 0%,#9B72F8 55%,#F66B97 100%)";
+
 const ui: Record<string, CSSProperties> = {
-  root: { minHeight: "100vh", background: "#14131a", color: "#e8e6f0", fontFamily: "system-ui, sans-serif" },
-  gate: { position: "fixed", inset: 0, background: "#14131a", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" },
-  gateCard: { width: 320, padding: 28, background: "#1e1d26", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12 },
-  introRoot: { minHeight: "100vh", background: "#14131a", color: "#e8e6f0", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif", padding: 24 },
-  introCol: { width: "min(720px, 94vw)" },
-  introBox: { background: "#1e1d26", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, overflow: "hidden", boxShadow: "0 30px 80px -40px rgba(0,0,0,.8)" },
+  root: { minHeight: "100vh", background: "#131318", color: "#E3E3E8", fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif" },
+  gradientText: { backgroundImage: GRADIENT, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" },
+  gradientTitle: {
+    backgroundImage: GRADIENT,
+    WebkitBackgroundClip: "text",
+    backgroundClip: "text",
+    color: "transparent",
+    fontSize: 32,
+    fontWeight: 700,
+    textAlign: "center",
+    letterSpacing: "-0.01em",
+  },
+  gate: { position: "fixed", inset: 0, background: "#131318", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" },
+  gateCard: { width: 330, padding: 30, background: "#1E1F24", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 22 },
+  introRoot: { minHeight: "100vh", background: "#131318", color: "#E3E3E8", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif", padding: 24 },
+  introCol: { width: "min(760px, 94vw)" },
+  introBox: {
+    background: "#1E1F24",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 26,
+    overflow: "hidden",
+    boxShadow: "0 30px 90px -45px rgba(0,0,0,.9)",
+  },
   introTextarea: {
     width: "100%",
     boxSizing: "border-box",
-    minHeight: 220,
+    minHeight: 190,
     background: "transparent",
-    color: "#e8e6f0",
+    color: "#E3E3E8",
     border: "none",
     outline: "none",
-    padding: "18px 16px",
-    fontSize: 15,
-    lineHeight: 1.65,
+    padding: "20px 18px 10px",
+    fontSize: 15.5,
+    lineHeight: 1.7,
     fontFamily: "inherit",
     resize: "vertical",
   },
@@ -772,70 +751,107 @@ const ui: Record<string, CSSProperties> = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: "12px 20px",
-    background: "rgba(20,19,26,0.92)",
-    backdropFilter: "blur(8px)",
-    borderBottom: "1px solid rgba(255,255,255,0.08)",
+    padding: "12px 22px",
+    background: "rgba(19,19,24,0.9)",
+    backdropFilter: "blur(12px)",
+    borderBottom: "1px solid rgba(255,255,255,0.06)",
   },
-  cols: { display: "flex", gap: 24, padding: "18px 20px 80px", alignItems: "flex-start" },
-  side: { width: 340, flex: "none", position: "sticky", top: 64, maxHeight: "calc(100vh - 80px)", overflowY: "auto", paddingRight: 6 },
-  fieldLabel: { fontSize: 11.5, color: "#8e8b9c", marginBottom: 5 },
+  cols: { display: "flex", gap: 26, padding: "20px 22px 90px", alignItems: "flex-start" },
+  side: { width: 350, flex: "none", position: "sticky", top: 66, maxHeight: "calc(100vh - 84px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, paddingRight: 4 },
+  panel: { background: "#1E1F24", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, overflow: "hidden" },
+  panelHead: {
+    width: "100%",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    background: "transparent",
+    border: "none",
+    padding: "13px 14px",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#C7CAD1",
+    textAlign: "left",
+  },
+  fieldLabel: { fontSize: 11.5, color: "#9AA0A6", marginBottom: 5 },
   input: {
     width: "100%",
     boxSizing: "border-box",
-    background: "#1e1d26",
-    color: "#e8e6f0",
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 6,
-    padding: "7px 9px",
+    background: "#282A31",
+    color: "#E3E3E8",
+    border: "1px solid transparent",
+    borderRadius: 12,
+    padding: "8px 11px",
     fontSize: 13.5,
+    outline: "none",
   },
   textarea: {
     width: "100%",
     boxSizing: "border-box",
-    background: "#1e1d26",
-    color: "#e8e6f0",
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 6,
-    padding: "7px 9px",
+    background: "#282A31",
+    color: "#E3E3E8",
+    border: "1px solid transparent",
+    borderRadius: 12,
+    padding: "8px 11px",
     fontSize: 13.5,
     fontFamily: "inherit",
-    lineHeight: 1.5,
+    lineHeight: 1.55,
     resize: "vertical",
+    outline: "none",
   },
-  primaryBtn: {
-    background: "#C44058",
+  range: { width: "100%", accentColor: "#4E86FF" },
+  primaryPill: {
+    background: GRADIENT,
     color: "#fff",
     border: "none",
-    borderRadius: 7,
-    padding: "9px 14px",
+    borderRadius: 999,
+    padding: "9px 18px",
     fontSize: 13.5,
     fontWeight: 600,
     cursor: "pointer",
   },
   ghostBtn: {
-    background: "transparent",
-    color: "#cfccdb",
-    border: "1px solid rgba(255,255,255,0.18)",
-    borderRadius: 7,
-    padding: "7px 12px",
+    background: "#282A31",
+    color: "#C7CAD1",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 999,
+    padding: "7px 13px",
     fontSize: 12.5,
     cursor: "pointer",
   },
-  chipBtn: {
-    background: "#1e1d26",
-    color: "#cfccdb",
-    border: "1px solid rgba(255,255,255,0.12)",
+  chip: {
+    background: "#282A31",
+    color: "#C7CAD1",
+    border: "1px solid rgba(255,255,255,0.08)",
     borderRadius: 999,
-    padding: "4px 10px",
+    padding: "5px 12px",
     fontSize: 11.5,
     cursor: "pointer",
   },
+  chipLg: {
+    background: "#1E1F24",
+    color: "#C7CAD1",
+    border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: 999,
+    padding: "10px 18px",
+    fontSize: 13.5,
+    cursor: "pointer",
+  },
+  iconPill: {
+    background: "#1E1F24",
+    color: "#C7CAD1",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 999,
+    width: 34,
+    height: 34,
+    cursor: "pointer",
+    fontSize: 15,
+  },
   iconBtn: {
     background: "transparent",
-    color: "#8e8b9c",
-    border: "1px solid rgba(255,255,255,0.14)",
-    borderRadius: 6,
+    color: "#9AA0A6",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 8,
     width: 26,
     height: 26,
     cursor: "pointer",

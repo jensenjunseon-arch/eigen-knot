@@ -49,12 +49,16 @@ const meta = { issue, slug, title: values.title ?? "" };
 const img = resolve(need("img"));
 
 let content;
+let aiCards = null;
 if (values.deck) {
   content = JSON.parse(readFileSync(resolve(values.deck), "utf8"));
 } else if (!values["no-ai"]) {
   const bodyText = readFileSync(resolve(need("body")), "utf8");
   console.log(`· Claude로 본문 분석 중 (${values.model})…`);
-  content = await analyzeArticle(bodyText, meta, { model: values.model });
+  const result = await analyzeArticle(bodyText, meta, { model: values.model });
+  content = result.content;
+  aiCards = result.cards;
+  if (!meta.title && result.title) meta.title = result.title;
 } else {
   console.error("error: --no-ai 모드에는 --deck <content.json> 이 필요합니다.");
   process.exit(1);
@@ -68,7 +72,7 @@ content.cover = { ...content.cover, kicker: `Weekly Insight: ${issue} knot` };
 const bodyRoles = ["summary", "definition", "compare", "diagnosis", "analysis", "grid", "claim", "conclusion"];
 const dims = values.dim ? Object.fromEntries(bodyRoles.map((r) => [r, Number(values.dim)])) : undefined;
 
-const deck = { meta, content, bg: fileToDataUrl(img), focal: values.focal ?? "center", dims };
+const deck = { meta, content, bg: fileToDataUrl(img), focal: values.focal ?? "center", dims, cards: aiCards ?? undefined };
 
 const outDir = resolve(values.out ?? join(ROOT, "output", `issue-${String(issue).padStart(3, "0")}`));
 mkdirSync(outDir, { recursive: true });

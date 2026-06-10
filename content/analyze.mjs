@@ -20,11 +20,22 @@ const side = {
   properties: { label: str, headline: str, detail: str },
 };
 
+// Body roles the model may select (cover/closing are always included).
+const SELECTABLE_ROLES = ["summary", "definition", "compare", "diagnosis", "analysis", "grid", "claim", "conclusion"];
+
 export const DECK_SCHEMA = {
   type: "object",
-  required: ["cover", "summary", "definition", "compare", "diagnosis", "analysis", "grid", "claim", "conclusion"],
+  required: ["title", "card_roles", "cover", "summary", "definition", "compare", "diagnosis", "analysis", "grid", "claim", "conclusion"],
   additionalProperties: false,
   properties: {
+    title: { ...str, description: "이 카드뉴스의 제목 (글의 핵심을 담아 짧게)" },
+    card_roles: {
+      type: "array",
+      items: { type: "string", enum: SELECTABLE_ROLES },
+      minItems: 3,
+      maxItems: 8,
+      description: "이 글에 최적인 본문 카드 구성 (cover/closing은 자동 포함). 글이 짧거나 단순하면 적게, 논증이 풍부하면 많이.",
+    },
     cover: {
       type: "object",
       required: ["headline"],
@@ -107,6 +118,14 @@ const SYSTEM = `당신은 뉴스레터 "eigen knot"의 카드뉴스 에디터다
 - compare의 left/right detail은 각 1문장. 카드가 세로로 넘치면 전체가 실패한다.
 - 모든 텍스트는 한국어. 의미 단위 줄바꿈이 필요하면 \\n을 직접 넣어라(특히 헤드라인).
 
+[구성 결정 — card_roles]
+- 글을 읽고 이 글에 최적인 본문 카드 구성을 네가 결정하라. 모든 슬롯을 쓸 필요 없다.
+- 진짜 평행한 두 장면이 있을 때만 compare를 포함하라. 짧은 글이면 4~5장(summary·definition·claim·conclusion 정도)이 낫다.
+- 모든 콘텐츠 슬롯은 채우되(스키마 필수), card_roles에 없는 슬롯은 내보내기에서 제외된다.
+
+[제목 — title]
+- 글의 핵심 통찰을 담은 카드뉴스 제목을 직접 지어라. 표지 headline과 같아도 된다.
+
 emit_deck 도구로만 응답하라.`;
 
 export async function analyzeArticle(body, meta, { model = "sonnet" } = {}) {
@@ -131,5 +150,10 @@ export async function analyzeArticle(body, meta, { model = "sonnet" } = {}) {
 
   const tool = res.content.find((b) => b.type === "tool_use");
   if (!tool) throw new Error("모델이 emit_deck 도구를 호출하지 않았습니다.");
-  return tool.input;
+  const { title, card_roles, ...content } = tool.input;
+  // cover/closing은 항상 포함, 본문은 모델 선택을 정식 순서로 정렬.
+  const order = ["summary", "definition", "compare", "diagnosis", "analysis", "grid", "claim", "conclusion"];
+  const selected = order.filter((r) => Array.isArray(card_roles) && card_roles.includes(r));
+  const cards = ["cover", ...(selected.length ? selected : order), "closing"];
+  return { title: title || "", cards, content };
 }
