@@ -1,0 +1,32 @@
+{
+  "name": "eigen-knot",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "eigen knot — newsletter → 10 Instagram cards (1080×1350) generator",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "generate": "node scripts/generate.mjs",
+    "sample": "node scripts/generate.mjs --no-ai --deck src/sample/issue-14.json --img src/sample/issue-14-bg.svg --issue 14 --slug delayed-adulthood --title \"당신의 20대는 어쩌다 3년짜리가 되었을까\" --focal \"center 35%\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.65.0",
+    "@fontsource/cormorant-garamond": "^5.0.0",
+    "@fontsource/noto-serif-kr": "^5.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.20",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "archiver": "^7.0.1",
+    "playwright": "^1.48.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}

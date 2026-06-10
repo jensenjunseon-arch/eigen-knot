@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
+  <title>eigen knot sample placeholder photo — swap with a real jpg or png</title>
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a5568"/>
+      <stop offset="0.5" stop-color="#2c3340"/>
+      <stop offset="1" stop-color="#15181f"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.72" cy="0.22" r="0.7">
+      <stop offset="0" stop-color="#7d8ea0" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#7d8ea0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="0.18" cy="0.82" r="0.6">
+      <stop offset="0" stop-color="#5b5278" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#5b5278" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1080" height="1350" fill="url(#base)"/>
+  <rect width="1080" height="1350" fill="url(#glow)"/>
+  <rect width="1080" height="1350" fill="url(#glow2)"/>
+</svg>

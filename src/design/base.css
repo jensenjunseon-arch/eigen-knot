@@ -1,0 +1,16 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+img, svg { display: block; }
+
+/* Korean line-breaking: break only at spaces (어절 단위), never mid-word.
+   Missing this is the "너무 어/린 나이" bug (PRD §2.2, §10). */
+.ek-ko {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  text-wrap: pretty;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.ek-balance { text-wrap: balance; }
+/* Quotes / the watermark must never wrap (PRD §2.2, §11.7). */
+.ek-nowrap { white-space: nowrap; }
