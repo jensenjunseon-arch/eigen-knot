@@ -28,13 +28,9 @@ export default async function handler(req, res) {
   if (!deck.bg || !String(deck.bg).startsWith("data:"))
     return res.status(400).json({ error: "배경 이미지를 먼저 업로드하세요." });
 
-  const proto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0];
-  const host = req.headers["x-forwarded-host"] || req.headers.host;
-  const baseUrl = `${proto}://${host}`;
-
   try {
     const browser = await getBrowser();
-    const card = await captureCardViaUrl(deck, index, { browser, baseUrl });
+    const card = await captureCardViaUrl(deck, index, { browser });
     res.status(200).json({
       name: card.name,
       b64: card.buffer.toString("base64"),
