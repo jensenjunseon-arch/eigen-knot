@@ -55,6 +55,13 @@ function sendJson(res, status, obj) {
   res.end(body);
 }
 
+// Mirror api/_auth.js so dev behaves like prod when STUDIO_PASSWORD is set.
+function authed(req) {
+  const pw = process.env.STUDIO_PASSWORD;
+  if (!pw) return true;
+  return (req.headers["x-studio-password"] || "") === pw;
+}
+
 export function devApi() {
   return {
     name: "ek-dev-api",
@@ -62,9 +69,16 @@ export function devApi() {
       server.middlewares.use(async (req, res, next) => {
         const url = new URL(req.url, "http://localhost");
 
+        /* ── check (login probe) ─────────────────────────────────── */
+        if (url.pathname === "/api/check") {
+          if (!process.env.STUDIO_PASSWORD) return sendJson(res, 200, { ok: true, open: true });
+          return authed(req) ? sendJson(res, 200, { ok: true }) : sendJson(res, 401, { ok: false });
+        }
+
         /* ── analyze ─────────────────────────────────────────────── */
         if (req.method === "POST" && url.pathname === "/api/analyze") {
           try {
+            if (!authed(req)) return sendJson(res, 401, { error: "비밀번호가 필요합니다." });
             const key = loadEnvKey();
             if (!key) {
               return sendJson(res, 400, {
@@ -86,6 +100,7 @@ export function devApi() {
         /* ── capture ─────────────────────────────────────────────── */
         if (req.method === "POST" && url.pathname === "/api/capture") {
           try {
+            if (!authed(req)) return sendJson(res, 401, { error: "비밀번호가 필요합니다." });
             const { deck } = await readJsonBody(req, 64);
             if (!deck?.meta?.issue || !deck?.meta?.slug)
               return sendJson(res, 400, { error: "deck.meta.issue / slug가 필요합니다." });
@@ -112,11 +127,14 @@ export function devApi() {
             if (code !== 0) return sendJson(res, 500, { error: "capture 실패", log: text });
 
             const zipFile = (text.match(/✓ (eigen-knot-[a-z0-9-]+\.zip)/) || [])[1] ?? null;
+            const zipPath = zipFile ? join(outDir, zipFile) : null;
+            const zipB64 = zipPath && existsSync(zipPath) ? readFileSync(zipPath).toString("base64") : null;
             return sendJson(res, 200, {
               ok: true,
               overflowAny: text.includes("⚠"),
               files: [...text.matchAll(/✓ (\S+\.png)/g)].map((m) => m[1]),
-              zipUrl: zipFile ? `/api/zip?issue=${issueDir}&file=${zipFile}` : null,
+              zipB64,
+              zipName: zipFile,
               log: text,
             });
           } catch (e) {

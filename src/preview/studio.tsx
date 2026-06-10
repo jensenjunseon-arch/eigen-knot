@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import type { CardRole, Deck } from "@/types";
+import type { CardRole, Deck, DeckContent } from "@/types";
 import { CARD_ORDER } from "@/types";
 import { RenderCard } from "@/cards/cards";
 import { cardFilename } from "@/lib/filename";
 import { SAMPLE_DECK } from "@/sample";
 import { cardOverflow } from "./shared";
+import { apiFetch, checkPassword, getPw, savePw, imageToBg, downloadBase64 } from "./api";
 
 /* ════════════════════════════════════════════════════════════════════════
    eigen knot — card studio (M4)
@@ -189,6 +190,14 @@ export function Studio() {
   const [article, setArticle] = useState("");
   const [busy, setBusy] = useState<null | "ai" | "export">(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [unlocked, setUnlocked] = useState(false);
+  const [checked, setChecked] = useState(false);
+  useEffect(() => {
+    checkPassword(getPw()).then((r) => {
+      setUnlocked(r.ok || !!r.open);
+      setChecked(true);
+    });
+  }, []);
 
   // Autosave (bg가 5MB 한도를 넘기면 배경 없이 저장).
   useEffect(() => {
@@ -210,15 +219,11 @@ export function Studio() {
   const selDim = deck.dims?.[spec.role] ?? spec.dim;
   const bodyDim = deck.dims?.summary ?? 0.9;
 
-  /* 이미지 업로드 — svg는 url-encoded로 (base64 svg는 Chromium 배경에서 디코드 실패) */
+  /* 이미지 업로드 — 다운스케일 후 dataURL (svg는 url-encoded) */
   const onUpload = (file: File) => {
-    if (file.type === "image/svg+xml") {
-      file.text().then((t) => setDeck((d) => ({ ...d, bg: `data:image/svg+xml,${encodeURIComponent(t)}` })));
-    } else {
-      const r = new FileReader();
-      r.onload = () => setDeck((d) => ({ ...d, bg: String(r.result) }));
-      r.readAsDataURL(file);
-    }
+    imageToBg(file)
+      .then((bg) => setDeck((d) => ({ ...d, bg })))
+      .catch((e) => setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`));
   };
 
   /* AI 초안 */
@@ -226,15 +231,12 @@ export function Studio() {
     setBusy("ai");
     setNotice(null);
     try {
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ body: article, meta: deck.meta }),
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error ?? res.statusText);
-      j.content.cover = { ...j.content.cover, kicker: `Weekly Insight: ${deck.meta.issue} knot` };
-      setDeck((d) => ({ ...d, content: j.content }));
+      const j = await apiFetch<{ content: DeckContent }>("/api/analyze", { body: article, meta: deck.meta });
+      const content: DeckContent = {
+        ...j.content,
+        cover: { ...j.content.cover, kicker: `Weekly Insight: ${deck.meta.issue} knot` },
+      };
+      setDeck((d) => ({ ...d, content }));
       setNotice("✓ AI 초안 완성 — 카드를 눌러 다듬어 주세요.");
     } catch (e) {
       setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
@@ -248,15 +250,9 @@ export function Studio() {
     setBusy("export");
     setNotice(null);
     try {
-      const res = await fetch("/api/capture", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ deck }),
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error ?? res.statusText);
-      setNotice(j.overflowAny ? "⚠ 일부 카드가 넘쳤습니다 — 빨간 ⚠ 카드를 다듬어 주세요." : "✓ PNG 10장 + ZIP 완성");
-      if (j.zipUrl) window.location.href = j.zipUrl;
+      const j = await apiFetch<{ zipB64: string; zipName: string; overflowAny: boolean }>("/api/capture", { deck });
+      downloadBase64(j.zipB64, j.zipName);
+      setNotice(j.overflowAny ? "⚠ 일부 카드가 넘쳤습니다 — 빨간 ⚠ 카드를 다듬어 주세요." : "✓ PNG 10장 + ZIP 다운로드 완료");
     } catch (e) {
       setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -287,6 +283,9 @@ export function Studio() {
       }
     });
   };
+
+  if (!checked) return null;
+  if (!unlocked) return <LoginGate onUnlock={() => setUnlocked(true)} />;
 
   return (
     <div style={ui.root}>
@@ -438,6 +437,46 @@ export function Studio() {
   );
 }
 
+/* ── 로그인 게이트 ──────────────────────────────────────────────────────── */
+function LoginGate({ onUnlock }: { onUnlock: () => void }) {
+  const [pw, setLocal] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    setBusy(true);
+    setErr(null);
+    const r = await checkPassword(pw);
+    if (r.ok || r.open) {
+      savePw(pw);
+      onUnlock();
+    } else {
+      setErr("비밀번호가 올바르지 않습니다.");
+      setBusy(false);
+    }
+  };
+  return (
+    <div style={ui.gate}>
+      <div style={ui.gateCard}>
+        <div style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "#C44058", fontSize: 22 }}>eigen knot</div>
+        <div style={{ color: "#8e8b9c", fontSize: 13, margin: "6px 0 20px" }}>card studio — 비밀번호를 입력하세요</div>
+        <input
+          type="password"
+          autoFocus
+          value={pw}
+          onChange={(e) => setLocal(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          style={{ ...ui.input, marginBottom: 12 }}
+          placeholder="비밀번호"
+        />
+        {err && <div style={{ color: "#ff6b6b", fontSize: 12.5, marginBottom: 10 }}>{err}</div>}
+        <button style={{ ...ui.primaryBtn, width: "100%", opacity: busy ? 0.6 : 1 }} disabled={busy} onClick={submit}>
+          {busy ? "확인 중…" : "들어가기"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ── 작은 레이아웃 헬퍼/스타일 ──────────────────────────────────────────── */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -458,6 +497,8 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 const ui: Record<string, CSSProperties> = {
   root: { minHeight: "100vh", background: "#14131a", color: "#e8e6f0", fontFamily: "system-ui, sans-serif" },
+  gate: { position: "fixed", inset: 0, background: "#14131a", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" },
+  gateCard: { width: 320, padding: 28, background: "#1e1d26", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12 },
   topbar: {
     position: "sticky", top: 0, zIndex: 10, display: "flex", justifyContent: "space-between", alignItems: "center",
     padding: "12px 20px", background: "rgba(20,19,26,0.92)", backdropFilter: "blur(8px)", borderBottom: "1px solid rgba(255,255,255,0.08)",

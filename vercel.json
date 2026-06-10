@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "build": { "env": { "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1" } },
+  "functions": {
+    "api/capture.js": { "maxDuration": 60, "memory": 1769 },
+    "api/analyze.js": { "maxDuration": 30 }
+  }
+}
