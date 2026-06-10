@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "eigen knot — newsletter → 10 Instagram cards (1080×1350) generator",
+  "description": "eigen knot — newsletter → 10 Instagram carousel cards (1080×1350 PNG): React render + Playwright capture + optional Claude drafting",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/jensenjunseon-arch/eigen-knot.git" },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
