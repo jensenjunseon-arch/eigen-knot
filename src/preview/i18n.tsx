@@ -50,7 +50,7 @@ const EN = {
   // background panel
   bgPhoto: "Background photo",
   uploadImage: "Upload image (jpg/png)",
-  abstractBg: "🎲 Abstract background (free, instant)",
+  abstractBg: "🎲 Abstract background",
   aiBgLabel: "AI background (Gemini)",
   aiBgPlaceholder: "Describe the scene or mood — e.g. rainy night city window",
   aiBgGo: "Generate background",
@@ -183,7 +183,7 @@ const KO: Dict = {
   sizeNote: "현재 {w}×{h}px — 사이즈를 바꾸면 ⚠ 넘침 표시를 확인하세요.",
   bgPhoto: "배경 사진",
   uploadImage: "이미지 업로드 (jpg/png)",
-  abstractBg: "🎲 추상 배경 (무료·즉시)",
+  abstractBg: "🎲 추상 배경",
   aiBgLabel: "AI 배경 생성 (Gemini)",
   aiBgPlaceholder: "장면이나 분위기를 묘사 — 예: 비 오는 밤 도시의 창가",
   aiBgGo: "배경 생성",

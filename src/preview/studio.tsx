@@ -493,10 +493,13 @@ function StudioInner() {
       title: fresh ? "" : (deck?.meta.title ?? ""),
     };
     try {
-      const j = await apiFetch<{ title: string; cards: CardRole[]; content: DeckContent; lang?: string }>("/api/analyze", {
+      const j = await apiFetch<{ title: string; cards: CardRole[]; content: DeckContent; lang?: string; bgPrompt?: string }>("/api/analyze", {
         body: text,
         meta,
       });
+      // AI가 글에서 뽑은 배경 장면 제안 — 배경 패널에 미리 채워, 한 번의 클릭으로
+      // '딱 맞는' 이미지가 나오게 한다.
+      if (j.bgPrompt) setBgPrompt(j.bgPrompt);
       // 모델이 쓴 킥커를 살린다 — 비어 있을 때만 기본 문구로 채움.
       const content: DeckContent = {
         ...j.content,

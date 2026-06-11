@@ -38,6 +38,11 @@ export const DECK_SCHEMA = {
       ...str,
       description: "BCP-47 code of the language the card text is written in (same as the article), e.g. 'ko', 'en', 'ja'.",
     },
+    bg_prompt: {
+      ...str,
+      description:
+        "One-sentence visual scene for the deck's background photo, written in the article's language. A concrete, atmospheric, photographable scene that embodies the article's emotional core — a place, light, weather, object. Dark/moody-friendly. NO text, NO people's faces, NO abstract concepts. e.g. 'an empty subway platform late at night, one bench under dim light'.",
+    },
     card_roles: {
       type: "array",
       items: { type: "string", enum: SELECTABLE_ROLES },
@@ -124,6 +129,8 @@ const SYSTEM = `You are the card-news editor for the newsletter "eigen knot". Yo
 - Write ALL card text in the same language as the article. Korean article → Korean cards; English article → English cards; Japanese → Japanese; and so on. Never translate.
 - Report that language as a BCP-47 code in \`lang\` (e.g. "ko", "en", "ja").
 - definition slot: term_ko = the term in the ARTICLE's language (the field name '_ko' is legacy — never translate the term to Korean for a non-Korean article); term_en = a short English rendering. If the article is already English, term_en is a concise etymology or alternate phrasing.
+[Background photo suggestion]
+- In \`bg_prompt\`, propose ONE concrete photographable scene that carries the article's emotional core — a specific place, light, weather, or object (not an abstract concept, no text, no faces). Written in the article's language. The reader should feel "yes, THIS image" the moment they see the deck. Think like a film director choosing the establishing shot for this story.
 [Line breaks & expression — per language]
 Manual line breaks (\\n) in headlines must follow each language's own rules:
 - Korean: break at meaning units (의미 단위) — never right before a particle (조사). Compress enumerations with the middle dot (·). Avoid Latin labels except cover.kicker and definition.term_en.
@@ -194,10 +201,10 @@ export async function analyzeArticle(body, meta, { model = "sonnet" } = {}) {
 
   const tool = res.content.find((b) => b.type === "tool_use");
   if (!tool) throw new Error("The model did not call the emit_deck tool.");
-  const { title, lang, card_roles, ...content } = tool.input;
+  const { title, lang, card_roles, bg_prompt, ...content } = tool.input;
   // cover/closing always included; body roles ordered canonically.
   const order = ["summary", "definition", "compare", "diagnosis", "analysis", "grid", "claim", "conclusion"];
   const selected = order.filter((r) => Array.isArray(card_roles) && card_roles.includes(r));
   const cards = ["cover", ...(selected.length ? selected : order), "closing"];
-  return { title: title || "", lang: lang || "ko", cards, content };
+  return { title: title || "", lang: lang || "ko", bgPrompt: bg_prompt || "", cards, content };
 }
