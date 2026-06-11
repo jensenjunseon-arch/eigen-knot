@@ -13,7 +13,7 @@
 import { readFileSync, existsSync } from "fs";
 import { join, extname, dirname } from "path";
 import { fileURLToPath } from "url";
-import { ROLE_CARDNAMES, deckRoles, deckCanvas, cardFilename } from "../scripts/shared.mjs";
+import { ROLE_CARDNAMES, deckRoles, deckCanvas, resolvedCardFilename } from "../scripts/shared.mjs";
 
 // dist/ location: module-relative first (survives whatever cwd the serverless
 // runtime uses), then cwd as fallback. includeFiles in vercel.json ships the
@@ -86,7 +86,7 @@ export async function captureCardViaUrl(deck, index, { browser, baseUrl, scale =
     const overflow = await page.evaluate(() => window.__EK_OVERFLOW__ === true);
     const buffer = await page.locator(".ek-card").screenshot({ type: "png" });
     return {
-      name: cardFilename(i + 1, deck.meta.slug, deck.meta.issue, ROLE_CARDNAMES[roles[i]]),
+      name: resolvedCardFilename(i + 1, deck, roles[i]),
       buffer,
       overflow,
       total: roles.length,
@@ -139,7 +139,7 @@ export async function captureDeckViaUrl(deck, { browser, baseUrl, scale = 1 }) {
       if (overflow) overflowAny = true;
       const buffer = await page.locator(".ek-card").screenshot({ type: "png" });
       files.push({
-        name: cardFilename(i + 1, deck.meta.slug, deck.meta.issue, ROLE_CARDNAMES[roles[i]]),
+        name: resolvedCardFilename(i + 1, deck, roles[i]),
         buffer,
         overflow,
       });

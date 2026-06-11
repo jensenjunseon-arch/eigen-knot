@@ -54,6 +54,20 @@ export function zipName(slug, issue) {
   return `eigen-knot-weekly-issue-insight-${kebab(slug)}-knot-${nnn}.zip`;
 }
 
+/** Returns the effective ZIP filename, respecting the custom override if set. */
+export function resolvedZipName(deck) {
+  const custom = deck.meta?.customZipName?.trim();
+  if (custom) return `${kebab(custom) || "export"}.zip`;
+  return zipName(deck.meta.slug, deck.meta.issue);
+}
+
+/** Returns the effective card PNG filename, respecting the per-role custom override if set. */
+export function resolvedCardFilename(seq, deck, role) {
+  const custom = deck.meta?.customCardNames?.[role]?.trim();
+  if (custom) return `${kebab(custom) || "card"}.png`;
+  return cardFilename(seq, deck.meta.slug, deck.meta.issue, ROLE_CARDNAMES[role]);
+}
+
 const MIME = {
   ".svg": "image/svg+xml",
   ".png": "image/png",

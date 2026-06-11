@@ -10,7 +10,7 @@ import archiver from "archiver";
 import { createWriteStream, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, resolve, basename } from "node:path";
-import { zipName } from "../scripts/shared.mjs";
+import { resolvedZipName } from "../scripts/shared.mjs";
 import { captureDeckViaUrl } from "./serverless.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -48,7 +48,7 @@ export async function captureDeck(deck, { outDir, scale = 1, port = 5180, zip = 
 
   let zipPath = null;
   if (zip) {
-    zipPath = join(out, zipName(deck.meta.slug, deck.meta.issue));
+    zipPath = join(out, resolvedZipName(deck));
     await zipFiles(
       written.map((w) => w.path),
       zipPath,

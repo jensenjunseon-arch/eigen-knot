@@ -75,6 +75,10 @@ export interface DeckMeta {
   issue: number;
   slug: string;
   title: string;
+  /** Custom ZIP filename (no extension). If empty, auto-generated from slug+issue. */
+  customZipName?: string;
+  /** Per-role custom image filename (no extension). If empty, auto-generated. */
+  customCardNames?: Partial<Record<CardRole, string>>;
 }
 
 /* ── Platform size presets ────────────────────────────────────────────────── */
