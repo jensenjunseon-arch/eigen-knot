@@ -43,15 +43,18 @@ export function kebab(s) {
     .replace(/^-+|-+$/g, "");
 }
 
+// The "-knot-NNN" segment is dropped when no issue number is set.
+function knotSeg(issue) {
+  return issue ? `-knot-${String(issue).padStart(3, "0")}` : "";
+}
+
 export function cardFilename(seq, slug, issue, cardname) {
   const nn = String(seq).padStart(2, "0");
-  const nnn = String(issue).padStart(3, "0");
-  return `${nn}-eigen-knot-weekly-issue-insight-${kebab(slug)}-knot-${nnn}-${kebab(cardname)}.png`;
+  return `${nn}-eigen-knot-weekly-issue-insight-${kebab(slug)}${knotSeg(issue)}-${kebab(cardname)}.png`;
 }
 
 export function zipName(slug, issue) {
-  const nnn = String(issue).padStart(3, "0");
-  return `eigen-knot-weekly-issue-insight-${kebab(slug)}-knot-${nnn}.zip`;
+  return `eigen-knot-weekly-issue-insight-${kebab(slug)}${knotSeg(issue)}.zip`;
 }
 
 /** The user's deck name as a filename base, or null if unset. Custom names are

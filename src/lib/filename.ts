@@ -13,17 +13,20 @@ export function kebab(s: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-// {NN}-eigen-knot-weekly-issue-insight-{slug}-knot-{NNN}-{cardname}.png
-export function cardFilename(seq: number, slug: string, issue: number, cardname: string): string {
-  const nn = String(seq).padStart(2, "0");
-  const nnn = String(issue).padStart(3, "0");
-  return `${nn}-eigen-knot-weekly-issue-insight-${kebab(slug)}-knot-${nnn}-${kebab(cardname)}.png`;
+// The "-knot-NNN" segment is dropped when no issue number is set.
+function knotSeg(issue?: number): string {
+  return issue ? `-knot-${String(issue).padStart(3, "0")}` : "";
 }
 
-// eigen-knot-weekly-issue-insight-{slug}-knot-{NNN}.zip
-export function zipName(slug: string, issue: number): string {
-  const nnn = String(issue).padStart(3, "0");
-  return `eigen-knot-weekly-issue-insight-${kebab(slug)}-knot-${nnn}.zip`;
+// {NN}-eigen-knot-weekly-issue-insight-{slug}[-knot-{NNN}]-{cardname}.png
+export function cardFilename(seq: number, slug: string, issue: number | undefined, cardname: string): string {
+  const nn = String(seq).padStart(2, "0");
+  return `${nn}-eigen-knot-weekly-issue-insight-${kebab(slug)}${knotSeg(issue)}-${kebab(cardname)}.png`;
+}
+
+// eigen-knot-weekly-issue-insight-{slug}[-knot-{NNN}].zip
+export function zipName(slug: string, issue?: number): string {
+  return `eigen-knot-weekly-issue-insight-${kebab(slug)}${knotSeg(issue)}.zip`;
 }
 
 const ROLE_CARDNAMES = Object.fromEntries(CARD_ORDER.map((s) => [s.role, s.cardname])) as Record<CardRole, string>;

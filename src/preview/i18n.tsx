@@ -65,6 +65,9 @@ const EN = {
   reAiPlaceholder: "Paste text and press the button to rebuild the cards (current edits are overwritten).",
   analyzing: "Analyzing…",
   reAiButton: "Re-compose with AI",
+  // gallery
+  galleryClose: "✕ Back to grid",
+  galleryHint: "←/→ navigate · Esc to exit · double-click a card to zoom",
   // misc
   overflowBadge: "⚠ overflow",
   addItem: "+ Add item",
@@ -187,6 +190,8 @@ const KO: Dict = {
   reAiPlaceholder: "본문을 붙여넣고 누르면 카드 내용과 구성을 새로 만듭니다 (현재 편집 내용은 덮어씌워짐).",
   analyzing: "분석 중…",
   reAiButton: "AI로 다시 구성",
+  galleryClose: "✕ 그리드로",
+  galleryHint: "←/→ 이동 · Esc 닫기 · 카드를 더블클릭하면 확대",
   overflowBadge: "⚠ 넘침",
   addItem: "+ 항목 추가",
   removeItem: "이 항목 삭제",

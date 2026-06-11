@@ -108,12 +108,14 @@ function Thumb({
   index,
   selected,
   onSelect,
+  onZoom,
   width,
 }: {
   deck: Deck;
   index: number;
   selected: boolean;
   onSelect: () => void;
+  onZoom?: () => void;
   width: number;
 }) {
   const { t, d } = useI18n();
@@ -129,7 +131,7 @@ function Thumb({
   });
   const dim = deck.dims?.[spec.role] ?? spec.dim;
   return (
-    <div style={{ cursor: "pointer" }} onClick={onSelect}>
+    <div style={{ cursor: "pointer" }} onClick={onSelect} onDoubleClick={onZoom}>
       <div
         style={{
           width,
@@ -150,6 +152,99 @@ function Thumb({
           {String(index + 1).padStart(2, "0")} {d.roles[spec.role]} · dim {dim.toFixed(2)}
         </span>
         {overflow && <span style={{ color: "#C5221F" }}>{t("overflowBadge")}</span>}
+      </div>
+    </div>
+  );
+}
+
+/* ── 갤러리 뷰 (Finder 스타일): 큰 미리보기 + 아래 필름스트립 ──────────────
+   더블클릭으로 진입, Esc/✕로 복귀, ←/→로 카드 이동. 사이드바 편집 패널은
+   그대로 살아 있어서 "크게 보면서 다듬는" 루프가 된다. ─────────────────── */
+function GalleryView({
+  deck,
+  selIdx,
+  onSel,
+  onClose,
+}: {
+  deck: Deck;
+  selIdx: number;
+  onSel: (i: number) => void;
+  onClose: () => void;
+}) {
+  const { t, d } = useI18n();
+  const specs = activeSpecs(deck);
+  const spec = specs[selIdx];
+  const { w, h } = deckSize(deck);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.3);
+
+  // 큰 카드 스케일: 가용 폭과 (뷰포트 − 필름스트립/헤더) 높이에 맞춘다.
+  useEffect(() => {
+    const fit = () => {
+      const availW = wrapRef.current?.offsetWidth ?? 600;
+      const availH = Math.max(320, window.innerHeight - 330);
+      setScale(Math.min(availW / w, availH / h));
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [w, h]);
+
+  // 키보드: ←/→ 이동, Esc 닫기.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") onSel(Math.max(0, selIdx - 1));
+      if (e.key === "ArrowRight") onSel(Math.min(specs.length - 1, selIdx + 1));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selIdx, specs.length, onClose, onSel]);
+
+  // 선택 카드가 필름스트립 밖이면 보이게 스크롤.
+  useEffect(() => {
+    stripRef.current?.children[selIdx]?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  }, [selIdx]);
+
+  return (
+    <div ref={wrapRef}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <span style={{ fontSize: 12.5, color: "#5F6368" }}>
+          {String(selIdx + 1).padStart(2, "0")} {d.roles[spec.role]} · {selIdx + 1}/{specs.length}
+          <span style={{ marginLeft: 12, color: "#9AA0A6", fontSize: 11.5 }}>{t("galleryHint")}</span>
+        </span>
+        <button style={ui.chip} onClick={onClose}>
+          {t("galleryClose")}
+        </button>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "center" }} onDoubleClick={onClose}>
+        <div
+          style={{
+            width: Math.round(w * scale),
+            height: Math.round(h * scale),
+            overflow: "hidden",
+            borderRadius: 18,
+            boxShadow: "0 18px 60px -18px rgba(20,40,80,0.45)",
+          }}
+        >
+          <div style={{ width: w, height: h, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+            <RenderCard deck={deck} spec={spec} />
+          </div>
+        </div>
+      </div>
+
+      <div
+        ref={stripRef}
+        style={{ display: "flex", gap: 14, overflowX: "auto", marginTop: 16, paddingBottom: 10 }}
+      >
+        {specs.map((s, i) => (
+          <div key={s.role} style={{ flex: "none" }}>
+            <Thumb deck={deck} index={i} selected={i === selIdx} onSelect={() => onSel(i)} onZoom={onClose} width={110} />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -269,6 +364,7 @@ function StudioInner() {
   const [prog, setProg] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [shareFiles, setShareFiles] = useState<File[] | null>(null);
+  const [gallery, setGallery] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [checked, setChecked] = useState(false);
 
@@ -312,10 +408,11 @@ function StudioInner() {
     if (!text.trim()) return;
     setBusy("ai");
     setNotice(null);
-    const issue = fresh ? (deck?.meta.issue ?? 0) + 1 || 1 : (deck?.meta.issue ?? 1);
+    // 비워둔 호 번호는 비운 채로 둔다 (파일명·끝맺음 문구에서 자동 생략).
+    const issue = fresh ? (deck?.meta.issue ?? 0) + 1 || 1 : deck?.meta.issue;
     const meta = {
       issue,
-      slug: fresh || !deck?.meta.slug ? `knot-${String(issue).padStart(3, "0")}` : deck.meta.slug,
+      slug: fresh || !deck?.meta.slug ? `knot-${String(issue ?? 1).padStart(3, "0")}` : deck.meta.slug,
       title: fresh ? "" : (deck?.meta.title ?? ""),
     };
     try {
@@ -326,7 +423,7 @@ function StudioInner() {
       // 모델이 쓴 킥커를 살린다 — 비어 있을 때만 기본 문구로 채움.
       const content: DeckContent = {
         ...j.content,
-        cover: { ...j.content.cover, kicker: j.content.cover.kicker?.trim() || `Weekly Insight: ${meta.issue} knot` },
+        cover: { ...j.content.cover, kicker: j.content.cover.kicker?.trim() || (meta.issue ? `Weekly Insight: ${meta.issue} knot` : "Weekly Insight") },
       };
       setDeck((d) => {
         const lang = j.lang ?? d?.lang;
@@ -660,9 +757,12 @@ function StudioInner() {
               <input
                 style={ui.input}
                 type="number"
-                value={deck.meta.issue}
+                value={deck.meta.issue ?? ""}
                 min={1}
-                onChange={(e) => patch({ meta: { ...deck.meta, issue: Math.max(1, Math.round(Number(e.target.value)) || 1) } })}
+                onChange={(e) => {
+                  const raw = e.target.value.trim();
+                  patch({ meta: { ...deck.meta, issue: raw === "" ? undefined : Math.max(1, Math.round(Number(raw)) || 1) } });
+                }}
               />
             </Row>
           </Panel>
@@ -684,13 +784,28 @@ function StudioInner() {
           </Panel>
         </aside>
 
-        {/* ── 카드 그리드 ── */}
+        {/* ── 카드 그리드 / 갤러리 ── */}
         <main style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(248px, 1fr))", gap: 22 }}>
-            {specs.map((s, i) => (
-              <Thumb key={s.role} deck={deck} index={i} selected={i === selIdx} onSelect={() => setSel(i)} width={248} />
-            ))}
-          </div>
+          {gallery ? (
+            <GalleryView deck={deck} selIdx={selIdx} onSel={setSel} onClose={() => setGallery(false)} />
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(248px, 1fr))", gap: 22 }}>
+              {specs.map((s, i) => (
+                <Thumb
+                  key={s.role}
+                  deck={deck}
+                  index={i}
+                  selected={i === selIdx}
+                  onSelect={() => setSel(i)}
+                  onZoom={() => {
+                    setSel(i);
+                    setGallery(true);
+                  }}
+                  width={248}
+                />
+              ))}
+            </div>
+          )}
         </main>
       </div>
     </div>

@@ -82,25 +82,28 @@ export interface DeckContent {
 
 /** Brand defaults for the closing card (used when deck.content.closing is absent).
  *  `lang` is the CARD language (deck.lang) — defaults to Korean for back-compat. */
-export function defaultClosing(issue: number, lang = "ko"): ClosingContent {
+export function defaultClosing(issue?: number, lang = "ko"): ClosingContent {
+  const footer = `Weekly Insight${issue ? ` · ${issue} knot` : ""}  |  Subscribe at eigenknot.com`;
   if (lang.toLowerCase().startsWith("ko")) {
     return {
       tagline: "현상 뒤에 본질을 꿰뚫는 시선",
       subline: "심리학자가 발행하는 뉴스레터",
       note: "[아이겐 노트]",
-      footer: `Weekly Insight · ${issue} knot  |  Subscribe at eigenknot.com`,
+      footer,
     };
   }
   return {
     tagline: "Seeing the essence behind the surface",
     subline: "A weekly newsletter by a psychologist",
     note: "",
-    footer: `Weekly Insight · ${issue} knot  |  Subscribe at eigenknot.com`,
+    footer,
   };
 }
 
 export interface DeckMeta {
-  issue: number;
+  /** Issue number. Optional — when absent, auto-filenames drop the issue
+   *  segment and the closing footer drops "· N knot". */
+  issue?: number;
   slug: string;
   title: string;
   /** User-chosen deck name (any language). Drives the ZIP filename and every

@@ -181,7 +181,7 @@ export async function analyzeArticle(body, meta, { model = "sonnet" } = {}) {
   }
   const client = new Anthropic({ apiKey });
   const modelId = MODELS[model] ?? model;
-  const userText = `Issue number: ${meta.issue}\nTitle hint: ${meta.title}\nSlug: ${meta.slug}\n\n[Article]\n${body}`;
+  const userText = `Issue number: ${meta.issue ?? ""}\nTitle hint: ${meta.title}\nSlug: ${meta.slug}\n\n[Article]\n${body}`;
 
   const res = await client.messages.create({
     model: modelId,
