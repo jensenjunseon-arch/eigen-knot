@@ -208,9 +208,9 @@ function Intro({
   return (
     <div style={ui.introRoot}>
       <div style={ui.introCol}>
-        <div style={ui.gradientTitle}>무엇을 카드뉴스로 만들까요?</div>
-        <div style={{ color: "#5F6368", fontSize: 15, textAlign: "center", margin: "12px 0 30px" }}>
-          글을 붙여넣으면 AI가 제목, 카드 구성, 장수까지 알아서 정합니다.
+        <div className="ek-intro-title" style={ui.gradientTitle}>무엇을 카드뉴스로 만들까요?</div>
+        <div style={{ color: "#5F6368", fontSize: 15, textAlign: "center", margin: "12px 0 30px", lineHeight: 1.7 }}>
+          글을 붙여넣으면<br />AI가 제목, 카드 구성, 장수까지<br />알아서 정합니다.
         </div>
 
         <div style={ui.introBox}>
@@ -430,20 +430,19 @@ export function Studio() {
 
   return (
     <div style={ui.root}>
-      <header style={ui.topbar}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <header className="ek-topbar" style={ui.topbar}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button style={ui.iconPill} onClick={() => setPhase("intro")} title="처음 화면으로">
             ←
           </button>
           <span style={{ ...ui.gradientText, fontSize: 16, fontWeight: 600 }}>eigen knot</span>
-          <span style={{ color: "#80868B", fontSize: 12.5 }}>card studio</span>
+          <span className="ek-topbar-sub" style={{ color: "#80868B", fontSize: 12.5 }}>card studio</span>
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          {notice && <span style={{ fontSize: 12.5, color: noticeColor(notice) }}>{notice}</span>}
-          <button style={{ ...ui.primaryPill, opacity: busy ? 0.6 : 1 }} disabled={busy !== null} onClick={runExport}>
-            {busy === "export" ? `내보내는 중 ${prog}` : `PNG ${specs.length}장 내보내기`}
-          </button>
-        </div>
+        <button className="ek-export-btn" style={{ ...ui.primaryPill, opacity: busy ? 0.6 : 1 }} disabled={busy !== null} onClick={runExport}>
+          <span className="ek-export-full">{busy === "export" ? `내보내는 중 ${prog}` : `PNG ${specs.length}장 내보내기`}</span>
+          <span className="ek-export-short">{busy === "export" ? (prog || "…") : "내보내기"}</span>
+        </button>
+        {notice && <div className="ek-topbar-notice" style={{ color: noticeColor(notice) }}>{notice}</div>}
       </header>
 
       <div className="ek-cols" style={ui.cols}>

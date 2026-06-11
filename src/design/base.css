@@ -25,4 +25,25 @@ img, svg { display: block; }
     max-height: none !important;
     padding-right: 0 !important;
   }
+
+  /* Topbar: wrap into two rows — logo+button on top, notice below */
+  .ek-topbar { flex-wrap: wrap !important; gap: 6px 0 !important; padding: 10px 14px !important; }
+  .ek-topbar-sub { display: none !important; }
+  /* Notice spans full width on its own row */
+  .ek-topbar-notice {
+    width: 100%;
+    font-size: 11.5px;
+    line-height: 1.4;
+  }
+  /* Compact export button text on mobile */
+  .ek-export-full { display: none !important; }
+  .ek-export-short { display: inline !important; }
+}
+
+/* Desktop: show full export text, hide short version */
+.ek-export-short { display: none; }
+.ek-topbar-notice { font-size: 12.5px; }
+
+@media (max-width: 480px) {
+  .ek-intro-title { font-size: 26px !important; }
 }
