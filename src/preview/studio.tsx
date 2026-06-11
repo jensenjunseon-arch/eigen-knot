@@ -8,6 +8,7 @@ import { FONT_CHOICES, DEFAULT_FONT_ID } from "@/design/fonts";
 import { SAMPLE_DECK } from "@/sample";
 import { cardOverflow } from "./shared";
 import { apiFetch, checkPassword, getPw, savePw, imageToBg, downloadBlob } from "./api";
+import { I18nProvider, LangSwitch, useI18n } from "./i18n";
 
 /* ════════════════════════════════════════════════════════════════════════
    eigen knot — card studio
@@ -18,53 +19,14 @@ import { apiFetch, checkPassword, getPw, savePw, imageToBg, downloadBlob } from 
 const STORE_KEY = "ek-studio-v1";
 const BODY_ROLES: CardRole[] = ["summary", "definition", "compare", "diagnosis", "analysis", "grid", "claim", "conclusion"];
 
-const ROLE_LABELS: Record<CardRole, string> = {
-  cover: "표지",
-  summary: "세 줄 요약",
-  definition: "정의",
-  compare: "★ 대비 장면",
-  diagnosis: "진단",
-  analysis: "심화 분석",
-  grid: "대비 그리드",
-  claim: "핵심 주장",
-  conclusion: "결론",
-  closing: "끝맺음",
-};
-
-const FIELD_LABELS: Record<string, string> = {
-  kicker: "킥커 (영문)",
-  headline: "헤드라인",
-  lines: "요약 3줄",
-  term_ko: "개념 (한글)",
-  term_en: "개념 (영문)",
-  body: "설명",
-  left: "장면 하나",
-  right: "장면 둘",
-  label: "라벨",
-  detail: "부연",
-  common: "공통 결론",
-  punch: "결정타 (강조색)",
-  sub: "보조 문장",
-  paras: "문단",
-  items: "항목",
-  rows: "행 (좌 라벨 → 우 결론)",
-  intro: "도입",
-  couplet: "대구 2줄",
-  emphasis: "강조 문장 (강조색)",
-  tagline: "첫 줄 (큰 글씨)",
-  subline: "둘째 줄",
-  note: "워터마크 아래 줄",
-  footer: "맨 아래 줄 (영문)",
-};
-
-// 모던 강조색 팔레트 (다크 사진 위에서 또렷한 톤).
+// Modern accent palette (tones that stay crisp on dark photos). Labels live in i18n.
 const ACCENT_PRESETS = [
-  { label: "로즈", value: "#FB7185" },
-  { label: "바이올렛", value: "#A78BFA" },
-  { label: "스카이", value: "#38BDF8" },
-  { label: "에메랄드", value: "#34D399" },
-  { label: "앰버", value: "#FBBF24" },
-  { label: "와인 (클래식)", value: "#C44058" },
+  { id: "rose", value: "#FB7185" },
+  { id: "violet", value: "#A78BFA" },
+  { id: "sky", value: "#38BDF8" },
+  { id: "emerald", value: "#34D399" },
+  { id: "amber", value: "#FBBF24" },
+  { id: "wine", value: "#C44058" },
 ];
 
 type Path = (string | number)[];
@@ -96,6 +58,7 @@ function FieldEditor({
   path: Path;
   onSet: (path: Path, v: unknown) => void;
 }): ReactNode {
+  const { t, d } = useI18n();
   if (typeof value === "string") {
     return (
       <textarea
@@ -113,13 +76,13 @@ function FieldEditor({
         {value.map((item, i) => (
           <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 6, alignItems: "start" }}>
             <FieldEditor value={item} path={[...path, i]} onSet={onSet} />
-            <button title="이 항목 삭제" style={ui.iconBtn} onClick={() => onSet(path, value.filter((_, j) => j !== i))}>
+            <button title={t("removeItem")} style={ui.iconBtn} onClick={() => onSet(path, value.filter((_, j) => j !== i))}>
               ×
             </button>
           </div>
         ))}
         <button style={ui.ghostBtn} onClick={() => onSet(path, [...value, isTupleRows ? ["", ""] : ""])}>
-          + 항목 추가
+          {t("addItem")}
         </button>
       </div>
     );
@@ -129,7 +92,7 @@ function FieldEditor({
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {Object.entries(value).map(([k, v]) => (
           <div key={k}>
-            <div style={ui.fieldLabel}>{FIELD_LABELS[k] ?? k}</div>
+            <div style={ui.fieldLabel}>{d.fields[k] ?? k}</div>
             <FieldEditor value={v} path={[...path, k]} onSet={onSet} />
           </div>
         ))}
@@ -153,6 +116,7 @@ function Thumb({
   onSelect: () => void;
   width: number;
 }) {
+  const { t, d } = useI18n();
   const specs = activeSpecs(deck);
   const spec = specs[index];
   const { w, h } = deckSize(deck);
@@ -183,9 +147,9 @@ function Thumb({
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11.5, color: "#5F6368" }}>
         <span>
-          {String(index + 1).padStart(2, "0")} {ROLE_LABELS[spec.role]} · dim {dim.toFixed(2)}
+          {String(index + 1).padStart(2, "0")} {d.roles[spec.role]} · dim {dim.toFixed(2)}
         </span>
-        {overflow && <span style={{ color: "#C5221F" }}>⚠ 넘침</span>}
+        {overflow && <span style={{ color: "#C5221F" }}>{t("overflowBadge")}</span>}
       </div>
     </div>
   );
@@ -207,29 +171,31 @@ function Intro({
   busy: boolean;
   notice: string | null;
 }) {
+  const { t } = useI18n();
   const [article, setArticle] = useState("");
   const ready = article.trim().length > 0 && !busy;
   return (
     <div style={ui.introRoot}>
+      <LangSwitch style={{ position: "fixed", top: 14, right: 14, zIndex: 20 }} />
       <div style={ui.introCol}>
-        <div className="ek-intro-title" style={ui.gradientTitle}>무엇을 카드뉴스로 만들까요?</div>
-        <div style={{ color: "#5F6368", fontSize: 15, textAlign: "center", margin: "12px 0 30px", lineHeight: 1.7 }}>
-          글을 붙여넣으면<br />AI가 제목, 카드 구성, 장수까지<br />알아서 정합니다.
+        <div className="ek-intro-title" style={ui.gradientTitle}>{t("introTitle")}</div>
+        <div style={{ color: "#5F6368", fontSize: 15, textAlign: "center", margin: "12px 0 30px", lineHeight: 1.7, whiteSpace: "pre-line" }}>
+          {t("introSub")}
         </div>
 
         <div style={ui.introBox}>
           <textarea
             style={ui.introTextarea}
-            placeholder="카드뉴스로 만들고 싶은 글을 여기에 붙여넣으세요…"
+            placeholder={t("introPlaceholder")}
             value={article}
             onChange={(e) => setArticle(e.target.value)}
           />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px 12px" }}>
             <span style={{ fontSize: 12, color: "#80868B" }}>
-              {busy ? "AI가 글을 읽고 카드 구성을 설계하는 중…" : ""}
+              {busy ? t("introBusy") : ""}
             </span>
             <button
-              title="AI로 카드 만들기"
+              title={t("aiMakeCards")}
               disabled={!ready}
               onClick={() => onAI(article)}
               style={{
@@ -261,11 +227,11 @@ function Intro({
         <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 26, flexWrap: "wrap" }}>
           {hasSaved && (
             <button style={ui.chipLg} onClick={onContinue}>
-              ↩ 이어서 편집
+              {t("continueEditing")}
             </button>
           )}
           <button style={ui.chipLg} onClick={onSample}>
-            샘플로 둘러보기
+            {t("exploreSample")}
           </button>
         </div>
       </div>
@@ -275,6 +241,15 @@ function Intro({
 
 /* ── 메인 스튜디오 ──────────────────────────────────────────────────────── */
 export function Studio() {
+  return (
+    <I18nProvider>
+      <StudioInner />
+    </I18nProvider>
+  );
+}
+
+function StudioInner() {
+  const { t, d } = useI18n();
   const [deck, setDeck] = useState<Deck | null>(() => {
     try {
       const raw = localStorage.getItem(STORE_KEY);
@@ -326,7 +301,7 @@ export function Studio() {
       if (!d) return d;
       // closing은 lazy — 첫 편집 때 기본 문구를 먼저 채워 넣어야 한 칸만 남는 사고가 없다.
       const content = path[0] === "closing" && !d.content.closing
-        ? { ...d.content, closing: defaultClosing(d.meta.issue) }
+        ? { ...d.content, closing: defaultClosing(d.meta.issue, d.lang) }
         : d.content;
       return { ...d, content: setAtPath(content, path, v) };
     });
@@ -344,7 +319,7 @@ export function Studio() {
       title: fresh ? "" : (deck?.meta.title ?? ""),
     };
     try {
-      const j = await apiFetch<{ title: string; cards: CardRole[]; content: DeckContent }>("/api/analyze", {
+      const j = await apiFetch<{ title: string; cards: CardRole[]; content: DeckContent; lang?: string }>("/api/analyze", {
         body: text,
         meta,
       });
@@ -358,11 +333,12 @@ export function Studio() {
         meta: { ...meta, title: j.title || meta.title },
         content,
         cards: j.cards,
+        lang: j.lang ?? d?.lang,
         bg: d?.bg ?? SAMPLE_DECK.bg,
       }));
       setSel(0);
       setPhase("studio");
-      setNotice(`✓ ${j.cards.length}장 구성 완료 — 카드를 눌러 다듬어 주세요.`);
+      setNotice(t("composed", { n: j.cards.length }));
     } catch (e) {
       setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -391,7 +367,7 @@ export function Studio() {
         try {
           card = await apiFetch("/api/capture-card", { deck, index: i });
         } catch {
-          setProg(`${i + 1}/${n} 재시도`);
+          setProg(t("retrying", { p: `${i + 1}/${n}` }));
           card = await apiFetch("/api/capture-card", { deck, index: i });
         }
         zip.file(card.name, card.b64, { base64: true });
@@ -407,8 +383,8 @@ export function Studio() {
       if (canShare) setShareFiles(files);
       setNotice(
         anyOverflow
-          ? "⚠ 일부 카드가 넘쳤습니다 — ⚠ 표시 카드를 다듬어 주세요."
-          : `✓ PNG ${n}장 다운로드 완료${canShare ? " — 아래 버튼으로 사진첩에 저장할 수 있어요." : ""}`,
+          ? t("someOverflow")
+          : t("downloadDone", { n }) + (canShare ? t("shareHintSuffix") : ""),
       );
     } catch (e) {
       setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
@@ -425,7 +401,7 @@ export function Studio() {
       await navigator.share({ files: shareFiles });
     } catch (e) {
       // 사용자가 시트를 닫은 경우(AbortError)는 조용히 무시.
-      if (e instanceof Error && e.name !== "AbortError") setNotice(`✗ 공유 실패: ${e.message}`);
+      if (e instanceof Error && e.name !== "AbortError") setNotice(t("shareFailed", { msg: e.message }));
     }
   };
 
@@ -468,21 +444,22 @@ export function Studio() {
     <div style={ui.root}>
       <header className="ek-topbar" style={ui.topbar}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button style={ui.iconPill} onClick={() => setPhase("intro")} title="처음 화면으로">
+          <button style={ui.iconPill} onClick={() => setPhase("intro")} title={t("backToStart")}>
             ←
           </button>
           <span style={{ ...ui.gradientText, fontSize: 16, fontWeight: 600 }}>eigen knot</span>
           <span className="ek-topbar-sub" style={{ color: "#80868B", fontSize: 12.5 }}>card studio</span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <LangSwitch />
           {shareFiles && busy === null && (
             <button style={ui.chip} onClick={() => void runShare()}>
-              📲 사진첩에 저장
+              {t("saveToPhotos")}
             </button>
           )}
           <button className="ek-export-btn" style={{ ...ui.primaryPill, opacity: busy ? 0.6 : 1 }} disabled={busy !== null} onClick={runExport}>
-            <span className="ek-export-full">{busy === "export" ? `내보내는 중 ${prog}` : `PNG ${specs.length}장 내보내기`}</span>
-            <span className="ek-export-short">{busy === "export" ? (prog || "…") : "내보내기"}</span>
+            <span className="ek-export-full">{busy === "export" ? t("exporting", { p: prog }) : t("exportPngs", { n: specs.length })}</span>
+            <span className="ek-export-short">{busy === "export" ? (prog || "…") : t("exportShort")}</span>
           </button>
         </div>
         {notice && <div className="ek-topbar-notice" style={{ color: noticeColor(notice) }}>{notice}</div>}
@@ -491,8 +468,8 @@ export function Studio() {
       <div className="ek-cols" style={ui.cols}>
         {/* ── 좌측 패널 ── */}
         <aside className="ek-side" style={ui.side}>
-          <Panel title={`카드 편집 — ${String(selIdx + 1).padStart(2, "0")} ${ROLE_LABELS[spec.role]}`} defaultOpen>
-            <Row label={`이 카드 dim · ${selDim.toFixed(2)}`}>
+          <Panel title={t("cardEdit", { nn: String(selIdx + 1).padStart(2, "0"), role: d.roles[spec.role] })} defaultOpen>
+            <Row label={t("cardDim", { v: selDim.toFixed(2) })}>
               <input
                 type="range"
                 min={0.4}
@@ -505,9 +482,9 @@ export function Studio() {
             </Row>
             {spec.role === "closing" ? (
               <>
-                <FieldEditor value={deck.content.closing ?? defaultClosing(deck.meta.issue)} path={["closing"]} onSet={setContent} />
+                <FieldEditor value={deck.content.closing ?? defaultClosing(deck.meta.issue, deck.lang)} path={["closing"]} onSet={setContent} />
                 <div style={{ fontSize: 11.5, color: "#9AA0A6", lineHeight: 1.6 }}>
-                  빈 칸으로 두면 그 줄은 카드에서 숨겨집니다. 가운데 큰 글씨는 ‘디자인’의 워터마크 문구입니다.
+                  {t("closingHint")}
                 </div>
               </>
             ) : (
@@ -515,17 +492,17 @@ export function Studio() {
             )}
           </Panel>
 
-          <Panel title="디자인" defaultOpen>
-            <Row label="폰트">
+          <Panel title={t("design")} defaultOpen>
+            <Row label={t("font")}>
               <select style={ui.input} value={deck.font ?? DEFAULT_FONT_ID} onChange={(e) => patch({ font: e.target.value })}>
                 {FONT_CHOICES.map((f) => (
                   <option key={f.id} value={f.id}>
-                    {f.label}
+                    {d.fontNames[f.id] ?? f.label}
                   </option>
                 ))}
               </select>
             </Row>
-            <Row label={`글자 크기 · ${Math.round((deck.typeScale ?? 1) * 100)}%`}>
+            <Row label={t("typeSize", { v: Math.round((deck.typeScale ?? 1) * 100) })}>
               <input
                 type="range"
                 min={0.7}
@@ -536,12 +513,12 @@ export function Studio() {
                 onChange={(e) => patch({ typeScale: Number(e.target.value) })}
               />
             </Row>
-            <Row label="강조색">
+            <Row label={t("accentColor")}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                 {ACCENT_PRESETS.map((p) => (
                   <button
                     key={p.value}
-                    title={p.label}
+                    title={d.accents[p.id] ?? p.id}
                     onClick={() => patch({ accent: p.value })}
                     style={{
                       width: 28,
@@ -559,17 +536,17 @@ export function Studio() {
               <input
                 style={ui.input}
                 value={deck.accent ?? "#C44058"}
-                placeholder="#FB7185 또는 rgb(251,113,133)"
+                placeholder={t("accentPlaceholder")}
                 onChange={(e) => patch({ accent: e.target.value })}
               />
             </Row>
-            <Row label="브랜드색 (끝맺음 카드)">
+            <Row label={t("brandColor")}>
               <input style={ui.input} value={deck.accent2 ?? "#D6D55A"} onChange={(e) => patch({ accent2: e.target.value })} />
             </Row>
-            <Row label="워터마크 문구 (비우면 숨김)">
+            <Row label={t("watermarkLabel")}>
               <input style={ui.input} value={deck.watermark ?? "eigen knot"} onChange={(e) => patch({ watermark: e.target.value })} />
             </Row>
-            <Row label="플랫폼 사이즈">
+            <Row label={t("platformSize")}>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {PLATFORMS.map((p) => {
                   const active = w === p.w && h === p.h;
@@ -582,23 +559,23 @@ export function Studio() {
                       }}
                       onClick={() => patch({ size: { w: p.w, h: p.h } })}
                     >
-                      {p.label}
+                      {d.platforms[p.id] ?? p.label}
                     </button>
                   );
                 })}
               </div>
               <div style={{ fontSize: 11, color: "#80868B", marginTop: 6 }}>
-                현재 {w}×{h}px — 사이즈를 바꾸면 ⚠ 넘침 표시를 확인하세요.
+                {t("sizeNote", { w, h })}
               </div>
             </Row>
           </Panel>
 
-          <Panel title="배경 사진">
+          <Panel title={t("bgPhoto")}>
             <label style={{ ...ui.primaryPill, display: "block", textAlign: "center" }}>
-              이미지 업로드 (jpg/png)
+              {t("uploadImage")}
               <input type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
             </label>
-            <Row label="초점 (focal)">
+            <Row label={t("focal")}>
               <input style={ui.input} value={deck.focal ?? "center"} onChange={(e) => patch({ focal: e.target.value })} />
             </Row>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -608,7 +585,7 @@ export function Studio() {
                 </button>
               ))}
             </div>
-            <Row label={`본문 dim 일괄 · ${bodyDim.toFixed(2)}`}>
+            <Row label={t("bodyDimAll", { v: bodyDim.toFixed(2) })}>
               <input
                 type="range"
                 min={0.5}
@@ -624,7 +601,7 @@ export function Studio() {
             </Row>
           </Panel>
 
-          <Panel title={`카드 구성 · ${specs.length}장`}>
+          <Panel title={t("composition", { n: specs.length })}>
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               {CARD_ORDER.map((s) => {
                 const current = deck.cards?.length ? deck.cards : ALL_ROLES;
@@ -644,19 +621,19 @@ export function Studio() {
                         setSel(0);
                       }}
                     />
-                    {ROLE_LABELS[s.role]}
+                    {d.roles[s.role]}
                   </label>
                 );
               })}
             </div>
-            <div style={{ fontSize: 11, color: "#80868B" }}>해제한 카드는 내보내기에서 빠지고, 파일 번호는 자동으로 당겨집니다.</div>
+            <div style={{ fontSize: 11, color: "#80868B" }}>{t("compositionNote")}</div>
           </Panel>
 
-          <Panel title="파일명">
-            <Row label="카드뉴스 이름 (한글 가능 — ZIP과 모든 이미지 파일명에 적용)">
+          <Panel title={t("filenames")}>
+            <Row label={t("deckNameLabel")}>
               <input
                 style={ui.input}
-                placeholder="예: my-card-news"
+                placeholder={t("deckNamePlaceholder")}
                 value={deck.meta.customZipName ?? ""}
                 onChange={(e) => patch({ meta: { ...deck.meta, customZipName: e.target.value } })}
               />
@@ -673,7 +650,7 @@ export function Studio() {
                 </div>
               );
             })()}
-            <Row label="호 번호 (이름을 비웠을 때의 자동 파일명에 사용)">
+            <Row label={t("issueLabel")}>
               <input
                 style={ui.input}
                 type="number"
@@ -684,10 +661,10 @@ export function Studio() {
             </Row>
           </Panel>
 
-          <Panel title="글 → AI 다시 구성">
+          <Panel title={t("reAi")}>
             <textarea
               style={{ ...ui.textarea, minHeight: 90 }}
-              placeholder="본문을 붙여넣고 누르면 카드 내용과 구성을 새로 만듭니다 (현재 편집 내용은 덮어씌워짐)."
+              placeholder={t("reAiPlaceholder")}
               value={article}
               onChange={(e) => setArticle(e.target.value)}
             />
@@ -696,7 +673,7 @@ export function Studio() {
               disabled={busy !== null || !article.trim()}
               onClick={() => void runAI(article, false)}
             >
-              {busy === "ai" ? "분석 중…" : "AI로 다시 구성"}
+              {busy === "ai" ? t("analyzing") : t("reAiButton")}
             </button>
           </Panel>
         </aside>
@@ -716,6 +693,7 @@ export function Studio() {
 
 /* ── 로그인 게이트 ──────────────────────────────────────────────────────── */
 function LoginGate({ onUnlock }: { onUnlock: () => void }) {
+  const { t } = useI18n();
   const [pw, setLocal] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -727,15 +705,16 @@ function LoginGate({ onUnlock }: { onUnlock: () => void }) {
       savePw(pw);
       onUnlock();
     } else {
-      setErr("비밀번호가 올바르지 않습니다.");
+      setErr(t("wrongPassword"));
       setBusy(false);
     }
   };
   return (
     <div style={ui.gate}>
+      <LangSwitch style={{ position: "fixed", top: 14, right: 14, zIndex: 20 }} />
       <div style={ui.gateCard}>
         <div style={{ ...ui.gradientText, fontSize: 24, fontWeight: 600 }}>eigen knot</div>
-        <div style={{ color: "#5F6368", fontSize: 13, margin: "8px 0 22px" }}>비밀번호를 입력하세요</div>
+        <div style={{ color: "#5F6368", fontSize: 13, margin: "8px 0 22px" }}>{t("enterPassword")}</div>
         <input
           type="password"
           autoFocus
@@ -743,11 +722,11 @@ function LoginGate({ onUnlock }: { onUnlock: () => void }) {
           onChange={(e) => setLocal(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
           style={{ ...ui.input, marginBottom: 12 }}
-          placeholder="비밀번호"
+          placeholder={t("passwordPlaceholder")}
         />
         {err && <div style={{ color: "#F28B82", fontSize: 12.5, marginBottom: 10 }}>{err}</div>}
         <button style={{ ...ui.primaryPill, width: "100%", opacity: busy ? 0.6 : 1 }} disabled={busy} onClick={submit}>
-          {busy ? "확인 중…" : "들어가기"}
+          {busy ? t("checking") : t("enter")}
         </button>
       </div>
     </div>

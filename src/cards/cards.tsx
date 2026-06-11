@@ -248,9 +248,9 @@ function ConclusionCard({ c, top, ...base }: CardProps<ConclusionContent>) {
 }
 
 /* 10 — Closing (editable; empty string hides a line) ────────────────────── */
-function ClosingCard({ meta, c, ...base }: BaseProps & { meta: DeckMeta; c?: ClosingContent }) {
+function ClosingCard({ meta, c, lang, ...base }: BaseProps & { meta: DeckMeta; c?: ClosingContent; lang?: string }) {
   const t = base.theme;
-  const cl = c ?? defaultClosing(meta.issue);
+  const cl = c ?? defaultClosing(meta.issue, lang);
   return (
     <CardBase {...base} watermark={false}>
       <div
@@ -326,6 +326,6 @@ export function RenderCard({ deck, spec }: { deck: Deck; spec: CardSpec }) {
     case "conclusion":
       return <ConclusionCard {...base} c={c.conclusion} top={spec.top} />;
     case "closing":
-      return <ClosingCard {...base} meta={deck.meta} c={c.closing} />;
+      return <ClosingCard {...base} meta={deck.meta} c={c.closing} lang={deck.lang} />;
   }
 }

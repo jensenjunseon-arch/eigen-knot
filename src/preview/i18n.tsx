@@ -1,0 +1,333 @@
+// Studio UI localization. English is the BASE language — every key is authored
+// in EN first and other locales mirror its shape (compile-checked via `Dict`).
+// This covers the studio chrome only; the language of the CARD TEXT is decided
+// by the AI from the article itself (see content/analyze.mjs).
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import type { CardRole } from "@/types";
+
+export type Locale = "en" | "ko";
+export const LOCALES: { id: Locale; label: string }[] = [
+  { id: "en", label: "EN" },
+  { id: "ko", label: "한국어" },
+];
+
+const EN = {
+  // intro
+  introTitle: "What shall we turn into card news?",
+  introSub: "Paste your text —\nAI decides the title, the card lineup,\nand how many cards to make.",
+  introPlaceholder: "Paste the text you want to turn into cards…",
+  introBusy: "AI is reading your text and designing the deck…",
+  aiMakeCards: "Make cards with AI",
+  continueEditing: "↩ Continue editing",
+  exploreSample: "Explore the sample",
+  // topbar
+  backToStart: "Back to start",
+  exporting: "Exporting {p}",
+  exportPngs: "Export {n} PNGs",
+  exportShort: "Export",
+  retrying: "{p} retrying",
+  saveToPhotos: "📲 Save to Photos",
+  // notices
+  composed: "✓ {n} cards composed — tap a card to refine.",
+  someOverflow: "⚠ Some cards overflow — refine the cards marked ⚠.",
+  downloadDone: "✓ {n} PNGs downloaded",
+  shareHintSuffix: " — use the button above to save them to Photos.",
+  shareFailed: "✗ Share failed: {msg}",
+  // card edit panel
+  cardEdit: "Edit card — {nn} {role}",
+  cardDim: "This card's dim · {v}",
+  closingHint: "Leave a line empty to hide it. The large center text is the watermark (see ‘Design’).",
+  // design panel
+  design: "Design",
+  font: "Font",
+  typeSize: "Type size · {v}%",
+  accentColor: "Accent color",
+  accentPlaceholder: "#FB7185 or rgb(251,113,133)",
+  brandColor: "Brand color (closing card)",
+  watermarkLabel: "Watermark text (empty = hidden)",
+  platformSize: "Platform size",
+  sizeNote: "Now {w}×{h}px — check the ⚠ overflow badges after a size change.",
+  // background panel
+  bgPhoto: "Background photo",
+  uploadImage: "Upload image (jpg/png)",
+  focal: "Focal point",
+  bodyDimAll: "Body dim (all) · {v}",
+  // composition panel
+  composition: "Cards · {n}",
+  compositionNote: "Unchecked cards are skipped on export; file numbers shift up automatically.",
+  // filename panel
+  filenames: "Filenames",
+  deckNameLabel: "Deck name (any language — names the ZIP and every image)",
+  deckNamePlaceholder: "e.g. my-card-news",
+  issueLabel: "Issue number (used by auto-naming when the name is empty)",
+  // re-AI panel
+  reAi: "Text → AI re-compose",
+  reAiPlaceholder: "Paste text and press the button to rebuild the cards (current edits are overwritten).",
+  analyzing: "Analyzing…",
+  reAiButton: "Re-compose with AI",
+  // misc
+  overflowBadge: "⚠ overflow",
+  addItem: "+ Add item",
+  removeItem: "Remove this item",
+  // login
+  enterPassword: "Enter the password",
+  passwordPlaceholder: "Password",
+  wrongPassword: "Wrong password.",
+  checking: "Checking…",
+  enter: "Enter",
+  // labels
+  roles: {
+    cover: "Cover",
+    summary: "3-line summary",
+    definition: "Definition",
+    compare: "★ Two scenes",
+    diagnosis: "Diagnosis",
+    analysis: "Analysis",
+    grid: "Contrast grid",
+    claim: "Core claim",
+    conclusion: "Conclusion",
+    closing: "Closing",
+  } as Record<CardRole, string>,
+  fields: {
+    kicker: "Kicker (Latin)",
+    headline: "Headline",
+    lines: "3 summary lines",
+    term_ko: "Term",
+    term_en: "Term (English)",
+    body: "Body",
+    left: "Scene one",
+    right: "Scene two",
+    label: "Label",
+    detail: "Detail",
+    common: "Shared takeaway",
+    punch: "Punchline (accent)",
+    sub: "Subline",
+    paras: "Paragraphs",
+    items: "Items",
+    rows: "Rows (label → takeaway)",
+    intro: "Intro",
+    couplet: "Couplet (2 lines)",
+    emphasis: "Emphasis (accent)",
+    tagline: "Line 1 (large)",
+    subline: "Line 2",
+    note: "Below the watermark",
+    footer: "Bottom line",
+  } as Record<string, string>,
+  accents: {
+    rose: "Rose",
+    violet: "Violet",
+    sky: "Sky",
+    emerald: "Emerald",
+    amber: "Amber",
+    wine: "Wine (classic)",
+  } as Record<string, string>,
+  fontNames: {
+    "noto-serif": "Noto Serif (serif)",
+    "nanum-myeongjo": "Nanum Myeongjo (serif)",
+    "gowun-batang": "Gowun Batang (soft serif)",
+    "noto-sans": "Noto Sans (sans)",
+    "gowun-dodum": "Gowun Dodum (round sans)",
+  } as Record<string, string>,
+  platforms: {
+    "ig-45": "Instagram 4:5",
+    "ig-11": "Instagram 1:1",
+    story: "Story/Reels 9:16",
+    "x-169": "X (Twitter) 16:9",
+  } as Record<string, string>,
+};
+
+type Dict = typeof EN;
+
+const KO: Dict = {
+  introTitle: "무엇을 카드뉴스로 만들까요?",
+  introSub: "글을 붙여넣으면\nAI가 제목, 카드 구성, 장수까지\n알아서 정합니다.",
+  introPlaceholder: "카드뉴스로 만들고 싶은 글을 여기에 붙여넣으세요…",
+  introBusy: "AI가 글을 읽고 카드 구성을 설계하는 중…",
+  aiMakeCards: "AI로 카드 만들기",
+  continueEditing: "↩ 이어서 편집",
+  exploreSample: "샘플로 둘러보기",
+  backToStart: "처음 화면으로",
+  exporting: "내보내는 중 {p}",
+  exportPngs: "PNG {n}장 내보내기",
+  exportShort: "내보내기",
+  retrying: "{p} 재시도",
+  saveToPhotos: "📲 사진첩에 저장",
+  composed: "✓ {n}장 구성 완료 — 카드를 눌러 다듬어 주세요.",
+  someOverflow: "⚠ 일부 카드가 넘쳤습니다 — ⚠ 표시 카드를 다듬어 주세요.",
+  downloadDone: "✓ PNG {n}장 다운로드 완료",
+  shareHintSuffix: " — 위 버튼으로 사진첩에 저장할 수 있어요.",
+  shareFailed: "✗ 공유 실패: {msg}",
+  cardEdit: "카드 편집 — {nn} {role}",
+  cardDim: "이 카드 dim · {v}",
+  closingHint: "빈 칸으로 두면 그 줄은 카드에서 숨겨집니다. 가운데 큰 글씨는 ‘디자인’의 워터마크 문구입니다.",
+  design: "디자인",
+  font: "폰트",
+  typeSize: "글자 크기 · {v}%",
+  accentColor: "강조색",
+  accentPlaceholder: "#FB7185 또는 rgb(251,113,133)",
+  brandColor: "브랜드색 (끝맺음 카드)",
+  watermarkLabel: "워터마크 문구 (비우면 숨김)",
+  platformSize: "플랫폼 사이즈",
+  sizeNote: "현재 {w}×{h}px — 사이즈를 바꾸면 ⚠ 넘침 표시를 확인하세요.",
+  bgPhoto: "배경 사진",
+  uploadImage: "이미지 업로드 (jpg/png)",
+  focal: "초점 (focal)",
+  bodyDimAll: "본문 dim 일괄 · {v}",
+  composition: "카드 구성 · {n}장",
+  compositionNote: "해제한 카드는 내보내기에서 빠지고, 파일 번호는 자동으로 당겨집니다.",
+  filenames: "파일명",
+  deckNameLabel: "카드뉴스 이름 (한글 가능 — ZIP과 모든 이미지 파일명에 적용)",
+  deckNamePlaceholder: "예: my-card-news",
+  issueLabel: "호 번호 (이름을 비웠을 때의 자동 파일명에 사용)",
+  reAi: "글 → AI 다시 구성",
+  reAiPlaceholder: "본문을 붙여넣고 누르면 카드 내용과 구성을 새로 만듭니다 (현재 편집 내용은 덮어씌워짐).",
+  analyzing: "분석 중…",
+  reAiButton: "AI로 다시 구성",
+  overflowBadge: "⚠ 넘침",
+  addItem: "+ 항목 추가",
+  removeItem: "이 항목 삭제",
+  enterPassword: "비밀번호를 입력하세요",
+  passwordPlaceholder: "비밀번호",
+  wrongPassword: "비밀번호가 올바르지 않습니다.",
+  checking: "확인 중…",
+  enter: "들어가기",
+  roles: {
+    cover: "표지",
+    summary: "세 줄 요약",
+    definition: "정의",
+    compare: "★ 대비 장면",
+    diagnosis: "진단",
+    analysis: "심화 분석",
+    grid: "대비 그리드",
+    claim: "핵심 주장",
+    conclusion: "결론",
+    closing: "끝맺음",
+  },
+  fields: {
+    kicker: "킥커 (영문)",
+    headline: "헤드라인",
+    lines: "요약 3줄",
+    term_ko: "개념",
+    term_en: "개념 (영문)",
+    body: "설명",
+    left: "장면 하나",
+    right: "장면 둘",
+    label: "라벨",
+    detail: "부연",
+    common: "공통 결론",
+    punch: "결정타 (강조색)",
+    sub: "보조 문장",
+    paras: "문단",
+    items: "항목",
+    rows: "행 (좌 라벨 → 우 결론)",
+    intro: "도입",
+    couplet: "대구 2줄",
+    emphasis: "강조 문장 (강조색)",
+    tagline: "첫 줄 (큰 글씨)",
+    subline: "둘째 줄",
+    note: "워터마크 아래 줄",
+    footer: "맨 아래 줄 (영문)",
+  },
+  accents: {
+    rose: "로즈",
+    violet: "바이올렛",
+    sky: "스카이",
+    emerald: "에메랄드",
+    amber: "앰버",
+    wine: "와인 (클래식)",
+  },
+  fontNames: {
+    "noto-serif": "노토 세리프 (명조)",
+    "nanum-myeongjo": "나눔명조",
+    "gowun-batang": "고운바탕 (부드러운 명조)",
+    "noto-sans": "노토 산스 (고딕)",
+    "gowun-dodum": "고운돋움 (둥근 고딕)",
+  },
+  platforms: {
+    "ig-45": "Instagram 4:5",
+    "ig-11": "Instagram 1:1",
+    story: "스토리/릴스 9:16",
+    "x-169": "X (트위터) 16:9",
+  },
+};
+
+const DICTS: Record<Locale, Dict> = { en: EN, ko: KO };
+
+const LANG_KEY = "ek-lang";
+
+function initialLocale(): Locale {
+  try {
+    const saved = localStorage.getItem(LANG_KEY);
+    if (saved === "en" || saved === "ko") return saved;
+  } catch {
+    /* private mode */
+  }
+  return navigator.language?.toLowerCase().startsWith("ko") ? "ko" : "en";
+}
+
+type Vars = Record<string, string | number>;
+function fmt(s: string, vars?: Vars): string {
+  return vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : s;
+}
+
+interface I18n {
+  lang: Locale;
+  setLang: (l: Locale) => void;
+  /** Translate a flat key with optional {var} interpolation. */
+  t: (key: keyof Omit<Dict, "roles" | "fields" | "accents" | "fontNames" | "platforms">, vars?: Vars) => string;
+  /** Direct access to the label maps (roles, fields, …). */
+  d: Dict;
+}
+
+const I18nContext = createContext<I18n | null>(null);
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const [lang, setLangState] = useState<Locale>(initialLocale);
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+  const setLang = (l: Locale) => {
+    setLangState(l);
+    try {
+      localStorage.setItem(LANG_KEY, l);
+    } catch {
+      /* private mode */
+    }
+  };
+  const d = DICTS[lang];
+  const t: I18n["t"] = (key, vars) => fmt(d[key] as string, vars);
+  return <I18nContext.Provider value={{ lang, setLang, t, d }}>{children}</I18nContext.Provider>;
+}
+
+export function useI18n(): I18n {
+  const ctx = useContext(I18nContext);
+  if (!ctx) throw new Error("useI18n must be used inside I18nProvider");
+  return ctx;
+}
+
+/** Compact EN | 한국어 toggle. */
+export function LangSwitch({ style }: { style?: React.CSSProperties }) {
+  const { lang, setLang } = useI18n();
+  return (
+    <div style={{ display: "inline-flex", gap: 2, padding: 3, borderRadius: 999, background: "rgba(255,255,255,0.7)", border: "1px solid rgba(0,0,0,0.08)", ...style }}>
+      {LOCALES.map((l) => (
+        <button
+          key={l.id}
+          onClick={() => setLang(l.id)}
+          style={{
+            border: "none",
+            borderRadius: 999,
+            padding: "4px 10px",
+            fontSize: 11.5,
+            fontWeight: 600,
+            cursor: "pointer",
+            background: lang === l.id ? "#4E86FF" : "transparent",
+            color: lang === l.id ? "#fff" : "#5F6368",
+          }}
+        >
+          {l.label}
+        </button>
+      ))}
+    </div>
+  );
+}

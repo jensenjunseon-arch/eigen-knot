@@ -50,6 +50,7 @@ const img = resolve(need("img"));
 
 let content;
 let aiCards = null;
+let aiLang = null;
 if (values.deck) {
   content = JSON.parse(readFileSync(resolve(values.deck), "utf8"));
 } else if (!values["no-ai"]) {
@@ -58,6 +59,7 @@ if (values.deck) {
   const result = await analyzeArticle(bodyText, meta, { model: values.model });
   content = result.content;
   aiCards = result.cards;
+  aiLang = result.lang;
   if (!meta.title && result.title) meta.title = result.title;
 } else {
   console.error("error: --no-ai 모드에는 --deck <content.json> 이 필요합니다.");
@@ -72,7 +74,7 @@ content.cover = { ...content.cover, kicker: `Weekly Insight: ${issue} knot` };
 const bodyRoles = ["summary", "definition", "compare", "diagnosis", "analysis", "grid", "claim", "conclusion"];
 const dims = values.dim ? Object.fromEntries(bodyRoles.map((r) => [r, Number(values.dim)])) : undefined;
 
-const deck = { meta, content, bg: fileToDataUrl(img), focal: values.focal ?? "center", dims, cards: aiCards ?? undefined };
+const deck = { meta, content, bg: fileToDataUrl(img), focal: values.focal ?? "center", dims, cards: aiCards ?? undefined, lang: aiLang ?? undefined };
 
 const outDir = resolve(values.out ?? join(ROOT, "output", `issue-${String(issue).padStart(3, "0")}`));
 mkdirSync(outDir, { recursive: true });

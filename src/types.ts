@@ -80,12 +80,21 @@ export interface DeckContent {
   closing?: ClosingContent;
 }
 
-/** Brand defaults for the closing card (used when deck.content.closing is absent). */
-export function defaultClosing(issue: number): ClosingContent {
+/** Brand defaults for the closing card (used when deck.content.closing is absent).
+ *  `lang` is the CARD language (deck.lang) — defaults to Korean for back-compat. */
+export function defaultClosing(issue: number, lang = "ko"): ClosingContent {
+  if (lang.toLowerCase().startsWith("ko")) {
+    return {
+      tagline: "현상 뒤에 본질을 꿰뚫는 시선",
+      subline: "심리학자가 발행하는 뉴스레터",
+      note: "[아이겐 노트]",
+      footer: `Weekly Insight · ${issue} knot  |  Subscribe at eigenknot.com`,
+    };
+  }
   return {
-    tagline: "현상 뒤에 본질을 꿰뚫는 시선",
-    subline: "심리학자가 발행하는 뉴스레터",
-    note: "[아이겐 노트]",
+    tagline: "Seeing the essence behind the surface",
+    subline: "A weekly newsletter by a psychologist",
+    note: "",
     footer: `Weekly Insight · ${issue} knot  |  Subscribe at eigenknot.com`,
   };
 }
@@ -139,6 +148,9 @@ export interface Deck {
   watermark?: string;
   /** Ordered subset of roles to render; default = all 10. */
   cards?: CardRole[];
+  /** BCP-47 language of the CARD TEXT (set by the AI from the article; e.g.
+   *  "ko", "en", "ja"). Drives closing-card defaults. Absent = Korean. */
+  lang?: string;
 }
 
 export interface CardSpec {
