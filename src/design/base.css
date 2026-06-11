@@ -38,6 +38,22 @@ img, svg { display: block; }
   /* Compact export button text on mobile */
   .ek-export-full { display: none !important; }
   .ek-export-short { display: inline !important; }
+
+  /* Cards (swipe carousel) above the edit panels. In column mode the inline
+     alignItems:flex-start would shrink-wrap children to content width — the
+     carousel's scroll content is thousands of px wide, so force stretch. */
+  .ek-cols { align-items: stretch !important; }
+  .ek-main { order: -1; width: 100%; max-width: 100%; overflow: hidden; }
+
+  /* Comfortable touch targets. 16px inputs also stop iOS focus auto-zoom. */
+  .ek-side input, .ek-side select, .ek-side textarea { font-size: 16px !important; }
+  .ek-side input:not([type="range"]):not([type="checkbox"]):not([type="file"]),
+  .ek-side select { min-height: 42px; }
+  .ek-side input[type="checkbox"] { width: 19px; height: 19px; }
+  .ek-side input[type="range"] { height: 30px; }
+  .ek-side button:not(.ek-swatch) { min-height: 40px; }
+  .ek-side section > button { padding: 14px !important; font-size: 14px !important; }
+  .ek-swatch { width: 34px !important; height: 34px !important; }
 }
 
 /* Desktop: show full export text, hide short version */

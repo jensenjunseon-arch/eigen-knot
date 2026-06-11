@@ -157,6 +157,69 @@ function Thumb({
   );
 }
 
+/* ── 모바일 감지 ────────────────────────────────────────────────────────── */
+function useIsMobile(): boolean {
+  const [m, setM] = useState(() => window.matchMedia("(max-width: 760px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 760px)");
+    const fn = (e: MediaQueryListEvent) => setM(e.matches);
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, []);
+  return m;
+}
+
+/* ── 모바일 캐러셀: 인스타그램과 같은 좌우 스와이프 + 스냅 ─────────────────
+   확대 없이 현재 크기로 한 장씩 넘겨 보고, 멈춘 카드가 곧 선택된 카드가
+   되어 아래 편집 패널과 동기화된다. ─────────────────────────────────────── */
+function CarouselView({ deck, selIdx, onSel }: { deck: Deck; selIdx: number; onSel: (i: number) => void }) {
+  const specs = activeSpecs(deck);
+  const ref = useRef<HTMLDivElement>(null);
+  const gap = 14;
+  // 퍼센트 패딩·부모 폭은 스크롤 콘텐츠와 순환 참조라 화면 폭 기준으로만 계산한다.
+  // pad = (화면 − 카드)/2 → 첫/끝 카드도 중앙 스냅.
+  const measure = () => {
+    const w = window.innerWidth - 44; // .ek-cols 좌우 패딩 22px씩
+    const cw = Math.min(320, w - 56);
+    return { cardW: cw, pad: Math.max(12, Math.round((w - cw) / 2)) };
+  };
+  const [{ cardW, pad }, setDims] = useState({ cardW: Math.min(320, window.innerWidth - 100), pad: 28 });
+  useEffect(() => {
+    const fit = () => setDims(measure());
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // 스와이프가 멈춘 위치의 카드를 선택으로 반영.
+  const onScroll = () => {
+    const el = ref.current;
+    if (!el) return;
+    const i = Math.max(0, Math.min(specs.length - 1, Math.round(el.scrollLeft / (cardW + gap))));
+    if (i !== selIdx) onSel(i);
+  };
+  return (
+    <div
+      ref={ref}
+      onScroll={onScroll}
+      style={{
+        display: "flex",
+        gap,
+        overflowX: "auto",
+        scrollSnapType: "x mandatory",
+        padding: `4px ${pad}px 10px`,
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
+      {specs.map((s, i) => (
+        <div key={s.role} style={{ flex: "none", scrollSnapAlign: "center" }}>
+          <Thumb deck={deck} index={i} selected={i === selIdx} onSelect={() => onSel(i)} width={cardW} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ── 갤러리 뷰 (Finder 스타일): 큰 미리보기 + 아래 필름스트립 ──────────────
    더블클릭으로 진입, Esc/✕로 복귀, ←/→로 카드 이동. 사이드바 편집 패널은
    그대로 살아 있어서 "크게 보면서 다듬는" 루프가 된다. ─────────────────── */
@@ -365,6 +428,7 @@ function StudioInner() {
   const [notice, setNotice] = useState<string | null>(null);
   const [shareFiles, setShareFiles] = useState<File[] | null>(null);
   const [gallery, setGallery] = useState(false);
+  const isMobile = useIsMobile();
   const [unlocked, setUnlocked] = useState(false);
   const [checked, setChecked] = useState(false);
 
@@ -621,6 +685,7 @@ function StudioInner() {
                 {ACCENT_PRESETS.map((p) => (
                   <button
                     key={p.value}
+                    className="ek-swatch"
                     title={d.accents[p.id] ?? p.id}
                     onClick={() => patch({ accent: p.value })}
                     style={{
@@ -784,9 +849,11 @@ function StudioInner() {
           </Panel>
         </aside>
 
-        {/* ── 카드 그리드 / 갤러리 ── */}
-        <main style={{ flex: 1, minWidth: 0 }}>
-          {gallery ? (
+        {/* ── 카드: 모바일=좌우 스와이프 캐러셀 / 데스크톱=그리드·갤러리 ── */}
+        <main className="ek-main" style={{ flex: 1, minWidth: 0 }}>
+          {isMobile ? (
+            <CarouselView deck={deck} selIdx={selIdx} onSel={setSel} />
+          ) : gallery ? (
             <GalleryView deck={deck} selIdx={selIdx} onSel={setSel} onClose={() => setGallery(false)} />
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(248px, 1fr))", gap: 22 }}>
