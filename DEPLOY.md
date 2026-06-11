@@ -9,11 +9,12 @@
 1. [vercel.com/new](https://vercel.com/new) → **Import Git Repository**
 2. `jensenjunseon-arch/eigen-knot` 선택 → **Import**
 3. Framework는 **Vite**로 자동 감지됨 (Build `npm run build`, Output `dist`). 그대로 둠.
-4. **Environment Variables**에 두 개 추가:
+4. **Environment Variables**에 추가:
    | Name | Value |
    |---|---|
    | `ANTHROPIC_API_KEY` | `sk-ant-...` (console.anthropic.com, 크레딧 필요) |
    | `STUDIO_PASSWORD` | 원하는 비밀번호 (이걸로 접근을 막습니다) |
+   | `GEMINI_API_KEY` | *(선택)* AI 배경 생성용 (aistudio.google.com → API key). 없으면 해당 버튼만 에러를 띄우고 나머지는 정상 동작 |
 5. **Deploy** → 1~2분 후 `https://eigen-knot-xxxx.vercel.app` 생성
 
 > CLI로 하려면: `npm i -g vercel && vercel link && vercel --prod` 후 대시보드(또는

@@ -7,7 +7,8 @@ import { resolvedZipName, resolvedCardFilename } from "@/lib/filename";
 import { FONT_CHOICES, DEFAULT_FONT_ID, defaultFontFor } from "@/design/fonts";
 import { SAMPLE_DECK } from "@/sample";
 import { cardOverflow } from "./shared";
-import { apiFetch, checkPassword, getPw, savePw, imageToBg, downloadBlob } from "./api";
+import { apiFetch, checkPassword, getPw, savePw, imageToBg, b64ToBg, downloadBlob } from "./api";
+import { abstractBg, randomSeed } from "@/lib/abstractBg";
 import { I18nProvider, LangSwitch, useI18n } from "./i18n";
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -434,7 +435,8 @@ function StudioInner() {
   const [phase, setPhase] = useState<"intro" | "studio">("intro");
   const [sel, setSel] = useState(0);
   const [article, setArticle] = useState("");
-  const [busy, setBusy] = useState<null | "ai" | "export">(null);
+  const [busy, setBusy] = useState<null | "ai" | "export" | "bg">(null);
+  const [bgPrompt, setBgPrompt] = useState("");
   const [prog, setProg] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [shareFiles, setShareFiles] = useState<File[] | null>(null);
@@ -587,6 +589,23 @@ function StudioInner() {
     imageToBg(file)
       .then((bg) => patch({ bg }))
       .catch((e) => setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`));
+  };
+
+  /* AI 배경 생성 (Gemini) — 스타일 프레임은 서버가 강제한다. */
+  const runGenBg = async () => {
+    if (!deck || !bgPrompt.trim()) return;
+    setBusy("bg");
+    setNotice(null);
+    try {
+      const { w, h } = deckSize(deck);
+      const j = await apiFetch<{ b64: string; mime: string }>("/api/generate-bg", { prompt: bgPrompt, w, h });
+      const bg = await b64ToBg(j.b64, j.mime);
+      patch({ bg });
+    } catch (e) {
+      setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(null);
+    }
   };
 
   if (!checked) return null;
@@ -754,6 +773,27 @@ function StudioInner() {
               {t("uploadImage")}
               <input type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
             </label>
+            <button style={{ ...ui.chip, width: "100%" }} onClick={() => patch({ bg: abstractBg(randomSeed()) })}>
+              {t("abstractBg")}
+            </button>
+            <Row label={t("aiBgLabel")}>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input
+                  style={ui.input}
+                  placeholder={t("aiBgPlaceholder")}
+                  value={bgPrompt}
+                  onChange={(e) => setBgPrompt(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && busy === null && void runGenBg()}
+                />
+                <button
+                  style={{ ...ui.chip, flex: "none", opacity: busy || !bgPrompt.trim() ? 0.55 : 1 }}
+                  disabled={busy !== null || !bgPrompt.trim()}
+                  onClick={() => void runGenBg()}
+                >
+                  {busy === "bg" ? t("aiBgBusy") : t("aiBgGo")}
+                </button>
+              </div>
+            </Row>
             <Row label={t("focal")}>
               <input style={ui.input} value={deck.focal ?? "center"} onChange={(e) => patch({ focal: e.target.value })} />
             </Row>

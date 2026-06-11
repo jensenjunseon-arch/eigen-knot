@@ -14,13 +14,14 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-function loadEnvKey() {
-  if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY;
+function loadEnvVar(name) {
+  if (process.env[name]) return process.env[name];
   const envPath = join(ROOT, ".env");
   if (!existsSync(envPath)) return null;
-  const m = readFileSync(envPath, "utf8").match(/^\s*ANTHROPIC_API_KEY\s*=\s*"?([^"\n]+)"?\s*$/m);
+  const m = readFileSync(envPath, "utf8").match(new RegExp(`^\\s*${name}\\s*=\\s*"?([^"\\n]+)"?\\s*$`, "m"));
   return m ? m[1].trim() : null;
 }
+const loadEnvKey = () => loadEnvVar("ANTHROPIC_API_KEY");
 
 function readJsonBody(req, limitMb = 64) {
   return new Promise((res, rej) => {
@@ -106,6 +107,53 @@ export function devApi() {
             const { analyzeArticle } = await import("../content/analyze.mjs");
             const result = await analyzeArticle(body, meta, { model: model || "sonnet" });
             return sendJson(res, 200, result); // { title, cards, content }
+          } catch (e) {
+            return sendJson(res, 500, { error: String(e?.message ?? e) });
+          }
+        }
+
+        /* ── generate background (Gemini) ────────────────────────── */
+        if (req.method === "POST" && url.pathname === "/api/generate-bg") {
+          try {
+            if (!authed(req)) return sendJson(res, 401, { error: "Password required." });
+            const key = loadEnvVar("GEMINI_API_KEY");
+            if (!key) return sendJson(res, 400, { error: "GEMINI_API_KEY is not set (.env)." });
+            const { prompt, w, h } = await readJsonBody(req, 1);
+            if (!prompt?.trim()) return sendJson(res, 400, { error: "prompt is required" });
+            if (prompt.length > 600) return sendJson(res, 400, { error: "prompt too long" });
+            const target = (Number(w) || 1080) / (Number(h) || 1350);
+            let bestA = "4:5";
+            let bestD = Infinity;
+            for (const a of ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]) {
+              const [aw, ah] = a.split(":").map(Number);
+              const d = Math.abs(aw / ah - target);
+              if (d < bestD) {
+                bestD = d;
+                bestA = a;
+              }
+            }
+            const frame =
+              `Generate a single atmospheric photographic background image for an editorial Instagram card. ` +
+              `White typography will be overlaid on it, so the image must be dark, muted, slightly underexposed, ` +
+              `with soft focus and gentle depth. Cinematic, minimal, calm. ` +
+              `Absolutely no text, no letters, no numbers, no watermark, no logo, no border, no frame. ` +
+              `Subject and mood: ${prompt.trim()}`;
+            const r = await fetch(
+              "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent",
+              {
+                method: "POST",
+                headers: { "content-type": "application/json", "x-goog-api-key": key },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: frame }] }],
+                  generationConfig: { imageConfig: { aspectRatio: bestA } },
+                }),
+              },
+            );
+            const j = await r.json().catch(() => ({}));
+            if (!r.ok) return sendJson(res, 502, { error: j?.error?.message || `Gemini API ${r.status}` });
+            const part = j?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
+            if (!part) return sendJson(res, 502, { error: "Gemini returned no image." });
+            return sendJson(res, 200, { b64: part.inlineData.data, mime: part.inlineData.mimeType || "image/png" });
           } catch (e) {
             return sendJson(res, 500, { error: String(e?.message ?? e) });
           }
