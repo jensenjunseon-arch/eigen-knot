@@ -39,17 +39,25 @@ export default async function handler(req, res) {
   if (!deck.bg || !String(deck.bg).startsWith("data:"))
     return res.status(400).json({ error: "배경 이미지를 먼저 업로드하세요." });
 
-  try {
-    const browser = await getBrowser();
-    const card = await captureCardViaUrl(deck, index, { browser });
-    res.status(200).json({
-      name: card.name,
-      b64: card.buffer.toString("base64"),
-      overflow: card.overflow,
-      total: card.total,
-    });
-  } catch (e) {
-    globalThis.__ekBrowser = undefined; // crashed browser → relaunch next call
-    res.status(500).json({ error: String((e && e.message) || e) });
+  // One retry with a fresh browser: Lambda can freeze between the client's
+  // sequential per-card calls and kill the Chromium subprocess mid-sequence.
+  // isConnected() in getBrowser catches most zombies, but a browser can also
+  // die DURING a capture — retry once before surfacing the error.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const browser = await getBrowser();
+      const card = await captureCardViaUrl(deck, index, { browser });
+      return res.status(200).json({
+        name: card.name,
+        b64: card.buffer.toString("base64"),
+        overflow: card.overflow,
+        total: card.total,
+      });
+    } catch (e) {
+      globalThis.__ekBrowser = undefined; // crashed browser → relaunch
+      const closed = /has been closed|browser.*disconnected|Target closed/i.test(String((e && e.message) || e));
+      if (attempt === 0 && closed) continue;
+      return res.status(500).json({ error: String((e && e.message) || e) });
+    }
   }
 }

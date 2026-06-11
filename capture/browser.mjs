@@ -10,6 +10,12 @@ export async function launchBrowser() {
 
   if (onServerless) {
     const sparticuz = (await import("@sparticuz/chromium")).default;
+    // Cards are pure DOM/CSS/images — no WebGL. Graphics mode ON makes
+    // sparticuz extract SwiftShader and initialize an in-process ANGLE/Vulkan
+    // GL stack at first page creation; when that init fails on the Lambda
+    // image, --single-process takes the WHOLE browser down ("Target page,
+    // context or browser has been closed" at newPage). Disable it.
+    sparticuz.setGraphicsMode = false;
     const { chromium } = await import("playwright-core");
     return chromium.launch({
       args: sparticuz.args,

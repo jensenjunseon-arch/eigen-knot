@@ -1,5 +1,5 @@
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+html, body { margin: 0; padding: 0; background: #131314; }
 img, svg { display: block; }
 
 /* Korean line-breaking: break only at spaces (어절 단위), never mid-word.

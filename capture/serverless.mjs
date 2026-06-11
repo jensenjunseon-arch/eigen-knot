@@ -10,9 +10,21 @@
 // avoiding the loopback request + Korean font download that previously caused
 // Chrome to crash in --single-process / memory-constrained environments.
 
-import { readFileSync } from "fs";
-import { join, extname } from "path";
+import { readFileSync, existsSync } from "fs";
+import { join, extname, dirname } from "path";
+import { fileURLToPath } from "url";
 import { ROLE_CARDNAMES, deckRoles, deckCanvas, cardFilename } from "../scripts/shared.mjs";
+
+// dist/ location: module-relative first (survives whatever cwd the serverless
+// runtime uses), then cwd as fallback. includeFiles in vercel.json ships the
+// folder into the function bundle preserving the project-root-relative path.
+function resolveDistDir() {
+  const candidates = [
+    join(dirname(fileURLToPath(import.meta.url)), "..", "dist"),
+    join(process.cwd(), "dist"),
+  ];
+  return candidates.find((p) => existsSync(p)) ?? candidates[0];
+}
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -50,7 +62,7 @@ export async function captureCardViaUrl(deck, index, { browser, baseUrl, scale =
   }, deck);
 
   if (!baseUrl) {
-    const distDir = join(process.cwd(), "dist");
+    const distDir = resolveDistDir();
     await ctx.route("**/*", async (route) => {
       const pathname = new URL(route.request().url()).pathname;
       const resolved = pathname === "/" ? "index.html" : pathname.replace(/^\//, "");
@@ -101,7 +113,7 @@ export async function captureDeckViaUrl(deck, { browser, baseUrl, scale = 1 }) {
   }, deck);
 
   if (!baseUrl) {
-    const distDir = join(process.cwd(), "dist");
+    const distDir = resolveDistDir();
     await ctx.route("**/*", async (route) => {
       const pathname = new URL(route.request().url()).pathname;
       const resolved = pathname === "/" ? "index.html" : pathname.replace(/^\//, "");

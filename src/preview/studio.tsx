@@ -227,7 +227,7 @@ function Intro({
                 borderRadius: "50%",
                 border: "none",
                 cursor: ready ? "pointer" : "default",
-                background: ready ? "linear-gradient(135deg,#4E86FF,#9B72F8)" : "#2A2B31",
+                background: ready ? "linear-gradient(135deg,#4E86FF,#9B72F8)" : "#282A2C",
                 color: ready ? "#fff" : "#6E727A",
                 fontSize: 18,
                 display: "flex",
@@ -574,7 +574,7 @@ export function Studio() {
                 return (
                   <label
                     key={s.role}
-                    style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer", color: on ? "#E3E3E8" : "#6E727A" }}
+                    style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer", color: on ? "#E3E3E3" : "#6E727A" }}
                   >
                     <input
                       type="checkbox"
@@ -707,7 +707,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 const GRADIENT = "linear-gradient(90deg,#4E86FF 0%,#9B72F8 55%,#F66B97 100%)";
 
 const ui: Record<string, CSSProperties> = {
-  root: { minHeight: "100vh", background: "#131318", color: "#E3E3E8", fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif" },
+  root: { minHeight: "100vh", background: "#131314", color: "#E3E3E3", fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif" },
   gradientText: { backgroundImage: GRADIENT, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" },
   gradientTitle: {
     backgroundImage: GRADIENT,
@@ -719,12 +719,12 @@ const ui: Record<string, CSSProperties> = {
     textAlign: "center",
     letterSpacing: "-0.01em",
   },
-  gate: { position: "fixed", inset: 0, background: "#131318", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" },
-  gateCard: { width: 330, padding: 30, background: "#1E1F24", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 22 },
-  introRoot: { minHeight: "100vh", background: "#131318", color: "#E3E3E8", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif", padding: 24 },
+  gate: { position: "fixed", inset: 0, background: "#131314", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" },
+  gateCard: { width: 330, padding: 30, background: "#1E1F20", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 22 },
+  introRoot: { minHeight: "100vh", background: "#131314", color: "#E3E3E3", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif", padding: 24 },
   introCol: { width: "min(760px, 94vw)" },
   introBox: {
-    background: "#1E1F24",
+    background: "#1E1F20",
     border: "1px solid rgba(255,255,255,0.08)",
     borderRadius: 26,
     overflow: "hidden",
@@ -735,7 +735,7 @@ const ui: Record<string, CSSProperties> = {
     boxSizing: "border-box",
     minHeight: 190,
     background: "transparent",
-    color: "#E3E3E8",
+    color: "#E3E3E3",
     border: "none",
     outline: "none",
     padding: "20px 18px 10px",
@@ -752,13 +752,15 @@ const ui: Record<string, CSSProperties> = {
     justifyContent: "space-between",
     alignItems: "center",
     padding: "12px 22px",
-    background: "rgba(19,19,24,0.9)",
+    background: "rgba(19,19,20,0.85)",
     backdropFilter: "blur(12px)",
     borderBottom: "1px solid rgba(255,255,255,0.06)",
   },
   cols: { display: "flex", gap: 26, padding: "20px 22px 90px", alignItems: "flex-start" },
   side: { width: 350, flex: "none", position: "sticky", top: 66, maxHeight: "calc(100vh - 84px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, paddingRight: 4 },
-  panel: { background: "#1E1F24", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, overflow: "hidden" },
+  // flexShrink 0이 없으면 사이드바(maxHeight+overflow:auto flex column)가
+  // 스크롤되는 대신 패널들을 찌그러뜨려서 아래 내용이 잘린다.
+  panel: { background: "#1E1F20", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, overflow: "hidden", flexShrink: 0 },
   panelHead: {
     width: "100%",
     display: "flex",
@@ -777,8 +779,8 @@ const ui: Record<string, CSSProperties> = {
   input: {
     width: "100%",
     boxSizing: "border-box",
-    background: "#282A31",
-    color: "#E3E3E8",
+    background: "#282A2C",
+    color: "#E3E3E3",
     border: "1px solid transparent",
     borderRadius: 12,
     padding: "8px 11px",
@@ -788,8 +790,8 @@ const ui: Record<string, CSSProperties> = {
   textarea: {
     width: "100%",
     boxSizing: "border-box",
-    background: "#282A31",
-    color: "#E3E3E8",
+    background: "#282A2C",
+    color: "#E3E3E3",
     border: "1px solid transparent",
     borderRadius: 12,
     padding: "8px 11px",
@@ -811,7 +813,7 @@ const ui: Record<string, CSSProperties> = {
     cursor: "pointer",
   },
   ghostBtn: {
-    background: "#282A31",
+    background: "#282A2C",
     color: "#C7CAD1",
     border: "1px solid rgba(255,255,255,0.08)",
     borderRadius: 999,
@@ -820,7 +822,7 @@ const ui: Record<string, CSSProperties> = {
     cursor: "pointer",
   },
   chip: {
-    background: "#282A31",
+    background: "#282A2C",
     color: "#C7CAD1",
     border: "1px solid rgba(255,255,255,0.08)",
     borderRadius: 999,
@@ -829,7 +831,7 @@ const ui: Record<string, CSSProperties> = {
     cursor: "pointer",
   },
   chipLg: {
-    background: "#1E1F24",
+    background: "#1E1F20",
     color: "#C7CAD1",
     border: "1px solid rgba(255,255,255,0.1)",
     borderRadius: 999,
@@ -838,7 +840,7 @@ const ui: Record<string, CSSProperties> = {
     cursor: "pointer",
   },
   iconPill: {
-    background: "#1E1F24",
+    background: "#1E1F20",
     color: "#C7CAD1",
     border: "1px solid rgba(255,255,255,0.08)",
     borderRadius: 999,
