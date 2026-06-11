@@ -216,13 +216,13 @@ function Intro({
         <div style={ui.introBox}>
           <textarea
             style={ui.introTextarea}
-            placeholder="뉴스레터 본문이나 쓰고 싶은 글을 여기에 붙여넣으세요…"
+            placeholder="카드뉴스로 만들고 싶은 글을 여기에 붙여넣으세요…"
             value={article}
             onChange={(e) => setArticle(e.target.value)}
           />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px 12px" }}>
             <span style={{ fontSize: 12, color: "#80868B" }}>
-              {busy ? "AI가 글을 읽고 카드 구성을 설계하는 중…" : "붙여넣은 뒤 → 버튼"}
+              {busy ? "AI가 글을 읽고 카드 구성을 설계하는 중…" : ""}
             </span>
             <button
               title="AI로 카드 만들기"
