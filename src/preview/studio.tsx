@@ -3,7 +3,7 @@ import JSZip from "jszip";
 import type { CardRole, Deck, DeckContent } from "@/types";
 import { CARD_ORDER, ALL_ROLES, PLATFORMS, activeSpecs, deckSize } from "@/types";
 import { RenderCard } from "@/cards/cards";
-import { zipName } from "@/lib/filename";
+import { zipName, kebab } from "@/lib/filename";
 import { FONT_CHOICES, DEFAULT_FONT_ID } from "@/design/fonts";
 import { SAMPLE_DECK } from "@/sample";
 import { cardOverflow } from "./shared";
@@ -605,7 +605,17 @@ export function Studio() {
             </Row>
             <Row label="슬러그 (영문 kebab — 파일명용)">
               <input style={ui.input} value={deck.meta.slug} onChange={(e) => patch({ meta: { ...deck.meta, slug: e.target.value } })} />
+              {(() => {
+                const converted = kebab(deck.meta.slug);
+                const raw = deck.meta.slug.trim();
+                if (!raw) return <div style={{ fontSize: 11, color: "#C5221F", marginTop: 4 }}>슬러그를 입력하면 파일명이 생성됩니다.</div>;
+                if (converted !== raw) return <div style={{ fontSize: 11, color: "#C5221F", marginTop: 4 }}>변환됨 → <b>{converted || "(빈 슬러그)"}</b></div>;
+                return null;
+              })()}
             </Row>
+            <div style={{ fontSize: 11, color: "#80868B", marginTop: 2, wordBreak: "break-all", fontFamily: "monospace" }}>
+              {zipName(deck.meta.slug, deck.meta.issue)}
+            </div>
             <Row label="제목">
               <input style={ui.input} value={deck.meta.title} onChange={(e) => patch({ meta: { ...deck.meta, title: e.target.value } })} />
             </Row>
