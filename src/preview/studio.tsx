@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import JSZip from "jszip";
 import type { CardRole, Deck, DeckContent } from "@/types";
-import { CARD_ORDER, ALL_ROLES, PLATFORMS, activeSpecs, deckSize } from "@/types";
+import { CARD_ORDER, ALL_ROLES, PLATFORMS, activeSpecs, deckSize, defaultClosing } from "@/types";
 import { RenderCard } from "@/cards/cards";
 import { resolvedZipName, resolvedCardFilename } from "@/lib/filename";
 import { FONT_CHOICES, DEFAULT_FONT_ID } from "@/design/fonts";
@@ -51,6 +51,10 @@ const FIELD_LABELS: Record<string, string> = {
   intro: "도입",
   couplet: "대구 2줄",
   emphasis: "강조 문장 (강조색)",
+  tagline: "첫 줄 (큰 글씨)",
+  subline: "둘째 줄",
+  note: "워터마크 아래 줄",
+  footer: "맨 아래 줄 (영문)",
 };
 
 // 모던 강조색 팔레트 (다크 사진 위에서 또렷한 톤).
@@ -289,6 +293,7 @@ export function Studio() {
   const [busy, setBusy] = useState<null | "ai" | "export">(null);
   const [prog, setProg] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [shareFiles, setShareFiles] = useState<File[] | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [checked, setChecked] = useState(false);
 
@@ -317,7 +322,14 @@ export function Studio() {
   const spec = specs[selIdx];
 
   const setContent = (path: Path, v: unknown) =>
-    setDeck((d) => (d ? { ...d, content: setAtPath(d.content, path, v) } : d));
+    setDeck((d) => {
+      if (!d) return d;
+      // closing은 lazy — 첫 편집 때 기본 문구를 먼저 채워 넣어야 한 칸만 남는 사고가 없다.
+      const content = path[0] === "closing" && !d.content.closing
+        ? { ...d.content, closing: defaultClosing(d.meta.issue) }
+        : d.content;
+      return { ...d, content: setAtPath(content, path, v) };
+    });
   const patch = (p: Partial<Deck>) => setDeck((d) => (d ? { ...d, ...p } : d));
 
   /* AI — 인트로: 새 호 생성(제목·구성 자동) / 스튜디오: 내용 재작성 */
@@ -358,14 +370,18 @@ export function Studio() {
     }
   };
 
-  /* PNG 내보내기 — 카드 1장씩 캡처 후 브라우저에서 ZIP 조립 */
+  /* PNG 내보내기 — 카드 1장씩 캡처 후 브라우저에서 ZIP 조립.
+     모바일(Web Share 지원)에서는 PNG들을 공유 시트로도 넘길 수 있게 보관 →
+     "사진첩에 저장" 버튼 (iOS 공유 시트의 '이미지 저장'이 사진 앱으로 들어간다). */
   const runExport = async () => {
     if (!deck) return;
     setBusy("export");
     setNotice(null);
+    setShareFiles(null);
     try {
       const n = specs.length;
       const zip = new JSZip();
+      const files: File[] = [];
       let anyOverflow = false;
       for (let i = 0; i < n; i++) {
         setProg(`${i + 1}/${n}`);
@@ -379,17 +395,37 @@ export function Studio() {
           card = await apiFetch("/api/capture-card", { deck, index: i });
         }
         zip.file(card.name, card.b64, { base64: true });
+        const bytes = Uint8Array.from(atob(card.b64), (ch) => ch.charCodeAt(0));
+        files.push(new File([bytes], card.name, { type: "image/png" }));
         if (card.overflow) anyOverflow = true;
       }
       setProg("zip…");
       const blob = await zip.generateAsync({ type: "blob" });
       downloadBlob(blob, resolvedZipName(deck));
-      setNotice(anyOverflow ? "⚠ 일부 카드가 넘쳤습니다 — ⚠ 표시 카드를 다듬어 주세요." : `✓ PNG ${n}장 다운로드 완료`);
+      const canShare =
+        typeof navigator.canShare === "function" && navigator.canShare({ files });
+      if (canShare) setShareFiles(files);
+      setNotice(
+        anyOverflow
+          ? "⚠ 일부 카드가 넘쳤습니다 — ⚠ 표시 카드를 다듬어 주세요."
+          : `✓ PNG ${n}장 다운로드 완료${canShare ? " — 아래 버튼으로 사진첩에 저장할 수 있어요." : ""}`,
+      );
     } catch (e) {
       setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(null);
       setProg("");
+    }
+  };
+
+  /* 사진첩 저장 — 공유 시트는 사용자 탭에서만 열 수 있어 별도 버튼으로 제공 */
+  const runShare = async () => {
+    if (!shareFiles) return;
+    try {
+      await navigator.share({ files: shareFiles });
+    } catch (e) {
+      // 사용자가 시트를 닫은 경우(AbortError)는 조용히 무시.
+      if (e instanceof Error && e.name !== "AbortError") setNotice(`✗ 공유 실패: ${e.message}`);
     }
   };
 
@@ -438,10 +474,17 @@ export function Studio() {
           <span style={{ ...ui.gradientText, fontSize: 16, fontWeight: 600 }}>eigen knot</span>
           <span className="ek-topbar-sub" style={{ color: "#80868B", fontSize: 12.5 }}>card studio</span>
         </div>
-        <button className="ek-export-btn" style={{ ...ui.primaryPill, opacity: busy ? 0.6 : 1 }} disabled={busy !== null} onClick={runExport}>
-          <span className="ek-export-full">{busy === "export" ? `내보내는 중 ${prog}` : `PNG ${specs.length}장 내보내기`}</span>
-          <span className="ek-export-short">{busy === "export" ? (prog || "…") : "내보내기"}</span>
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {shareFiles && busy === null && (
+            <button style={ui.chip} onClick={() => void runShare()}>
+              📲 사진첩에 저장
+            </button>
+          )}
+          <button className="ek-export-btn" style={{ ...ui.primaryPill, opacity: busy ? 0.6 : 1 }} disabled={busy !== null} onClick={runExport}>
+            <span className="ek-export-full">{busy === "export" ? `내보내는 중 ${prog}` : `PNG ${specs.length}장 내보내기`}</span>
+            <span className="ek-export-short">{busy === "export" ? (prog || "…") : "내보내기"}</span>
+          </button>
+        </div>
         {notice && <div className="ek-topbar-notice" style={{ color: noticeColor(notice) }}>{notice}</div>}
       </header>
 
@@ -461,9 +504,12 @@ export function Studio() {
               />
             </Row>
             {spec.role === "closing" ? (
-              <div style={{ fontSize: 12.5, color: "#9AA0A6", lineHeight: 1.6 }}>
-                끝맺음 카드는 고정 문구입니다 (워터마크 문구는 ‘디자인’에서 변경).
-              </div>
+              <>
+                <FieldEditor value={deck.content.closing ?? defaultClosing(deck.meta.issue)} path={["closing"]} onSet={setContent} />
+                <div style={{ fontSize: 11.5, color: "#9AA0A6", lineHeight: 1.6 }}>
+                  빈 칸으로 두면 그 줄은 카드에서 숨겨집니다. 가운데 큰 글씨는 ‘디자인’의 워터마크 문구입니다.
+                </div>
+              </>
             ) : (
               <FieldEditor value={deck.content[spec.role as keyof DeckContent]} path={[spec.role]} onSet={setContent} />
             )}

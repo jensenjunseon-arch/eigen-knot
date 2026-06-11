@@ -58,6 +58,14 @@ export interface ConclusionContent {
   intro: string;
   couplet: [string, string];
 }
+/** Closing (brand) card. All lines editable; empty string hides a line.
+ *  When the whole object is absent, eigen-knot brand defaults are used. */
+export interface ClosingContent {
+  tagline: string;
+  subline: string;
+  note: string;
+  footer: string;
+}
 
 export interface DeckContent {
   cover: CoverContent;
@@ -69,6 +77,17 @@ export interface DeckContent {
   grid: GridContent;
   claim: ClaimContent;
   conclusion: ConclusionContent;
+  closing?: ClosingContent;
+}
+
+/** Brand defaults for the closing card (used when deck.content.closing is absent). */
+export function defaultClosing(issue: number): ClosingContent {
+  return {
+    tagline: "현상 뒤에 본질을 꿰뚫는 시선",
+    subline: "심리학자가 발행하는 뉴스레터",
+    note: "[아이겐 노트]",
+    footer: `Weekly Insight · ${issue} knot  |  Subscribe at eigenknot.com`,
+  };
 }
 
 export interface DeckMeta {

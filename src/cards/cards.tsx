@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { EK, FONT } from "@/design/tokens";
 import type {
+  ClosingContent,
   CompareContent,
   CompareSide,
   ConclusionContent,
@@ -15,6 +16,7 @@ import type {
   SummaryContent,
   CardSpec,
 } from "@/types";
+import { defaultClosing } from "@/types";
 import { Rich } from "@/lib/richText";
 import { BaseProps, CardBase, CardBody, Kicker, Label, Rule, resolveTheme, useTheme } from "./CardBase";
 
@@ -245,9 +247,10 @@ function ConclusionCard({ c, top, ...base }: CardProps<ConclusionContent>) {
   );
 }
 
-/* 10 — Closing (fixed) ──────────────────────────────────────────────────── */
-function ClosingCard({ meta, ...base }: BaseProps & { meta: DeckMeta }) {
+/* 10 — Closing (editable; empty string hides a line) ────────────────────── */
+function ClosingCard({ meta, c, ...base }: BaseProps & { meta: DeckMeta; c?: ClosingContent }) {
   const t = base.theme;
+  const cl = c ?? defaultClosing(meta.issue);
   return (
     <CardBase {...base} watermark={false}>
       <div
@@ -262,8 +265,16 @@ function ClosingCard({ meta, ...base }: BaseProps & { meta: DeckMeta }) {
           padding: `0 ${Math.round(120 * t.sx)}px`,
         }}
       >
-        <div style={{ fontSize: t.ts(40), fontWeight: 500, lineHeight: 1.5 }}>현상 뒤에 본질을 꿰뚫는 시선</div>
-        <div style={{ fontSize: t.ts(30), color: EK.whiteFaint, marginTop: t.ts(14) }}>심리학자가 발행하는 뉴스레터</div>
+        {cl.tagline.trim() !== "" && (
+          <div className="ek-ko" style={{ fontSize: t.ts(40), fontWeight: 500, lineHeight: 1.5 }}>
+            <Rich text={cl.tagline} />
+          </div>
+        )}
+        {cl.subline.trim() !== "" && (
+          <div className="ek-ko" style={{ fontSize: t.ts(30), color: EK.whiteFaint, marginTop: t.ts(14) }}>
+            <Rich text={cl.subline} />
+          </div>
+        )}
         {/* The single accent2 moment in the whole deck — brand self-reference (§2.1). */}
         <div
           className="ek-nowrap"
@@ -271,13 +282,19 @@ function ClosingCard({ meta, ...base }: BaseProps & { meta: DeckMeta }) {
         >
           {t.watermark.trim() !== "" ? t.watermark : "eigen knot"}
         </div>
-        <div style={{ fontSize: t.ts(26), color: EK.whiteFaint }}>[아이겐 노트]</div>
-        <div
-          className="ek-nowrap"
-          style={{ fontFamily: FONT.display, fontStyle: "italic", fontSize: t.ts(27), color: EK.whiteFaint, marginTop: t.ts(42), letterSpacing: "0.02em" }}
-        >
-          Weekly Insight · {meta.issue} knot&nbsp;&nbsp;|&nbsp;&nbsp;Subscribe at eigenknot.com
-        </div>
+        {cl.note.trim() !== "" && (
+          <div className="ek-ko" style={{ fontSize: t.ts(26), color: EK.whiteFaint }}>
+            <Rich text={cl.note} />
+          </div>
+        )}
+        {cl.footer.trim() !== "" && (
+          <div
+            className="ek-nowrap"
+            style={{ fontFamily: FONT.display, fontStyle: "italic", fontSize: t.ts(27), color: EK.whiteFaint, marginTop: t.ts(42), letterSpacing: "0.02em" }}
+          >
+            <Rich text={cl.footer} />
+          </div>
+        )}
       </div>
     </CardBase>
   );
@@ -309,6 +326,6 @@ export function RenderCard({ deck, spec }: { deck: Deck; spec: CardSpec }) {
     case "conclusion":
       return <ConclusionCard {...base} c={c.conclusion} top={spec.top} />;
     case "closing":
-      return <ClosingCard {...base} meta={deck.meta} />;
+      return <ClosingCard {...base} meta={deck.meta} c={c.closing} />;
   }
 }
