@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import type { Deck } from "@/types";
 import { activeSpecs, deckSize } from "@/types";
 import { RenderCard } from "@/cards/cards";
-import { fontProbes, FONT_PROBE_TEXT } from "@/design/fonts";
+import { fontProbes, fontProbeText } from "@/design/fonts";
 import { SAMPLE_DECK } from "@/sample";
 import { cardOverflow } from "./shared";
 import { Studio } from "./studio";
@@ -29,7 +29,7 @@ function CaptureView({ deck, index }: { deck: Deck; index: number }) {
     (async () => {
       try {
         await document.fonts.ready;
-        await Promise.all(fontProbes(deck.font).map((p) => document.fonts.load(p, FONT_PROBE_TEXT)));
+        await Promise.all(fontProbes(deck.font).map((p) => document.fonts.load(p, fontProbeText(deck.font))));
       } catch {
         /* font API best-effort */
       }

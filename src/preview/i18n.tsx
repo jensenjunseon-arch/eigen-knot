@@ -127,6 +127,10 @@ const EN = {
     "gowun-batang": "Gowun Batang (soft serif)",
     "noto-sans": "Noto Sans (sans)",
     "gowun-dodum": "Gowun Dodum (round sans)",
+    kanit: "Kanit (Thai sans)",
+    prompt: "Prompt (Thai sans)",
+    montserrat: "Montserrat (Latin sans)",
+    "open-sans": "Open Sans (Latin sans)",
   } as Record<string, string>,
   platforms: {
     "ig-45": "Instagram 4:5",
@@ -242,6 +246,10 @@ const KO: Dict = {
     "gowun-batang": "고운바탕 (부드러운 명조)",
     "noto-sans": "노토 산스 (고딕)",
     "gowun-dodum": "고운돋움 (둥근 고딕)",
+    kanit: "Kanit (태국어 산스)",
+    prompt: "Prompt (태국어 산스)",
+    montserrat: "Montserrat (라틴 산스)",
+    "open-sans": "Open Sans (라틴 산스)",
   },
   platforms: {
     "ig-45": "Instagram 4:5",

@@ -4,7 +4,7 @@ import type { CardRole, Deck, DeckContent } from "@/types";
 import { CARD_ORDER, ALL_ROLES, PLATFORMS, activeSpecs, deckSize, defaultClosing } from "@/types";
 import { RenderCard } from "@/cards/cards";
 import { resolvedZipName, resolvedCardFilename } from "@/lib/filename";
-import { FONT_CHOICES, DEFAULT_FONT_ID } from "@/design/fonts";
+import { FONT_CHOICES, DEFAULT_FONT_ID, defaultFontFor } from "@/design/fonts";
 import { SAMPLE_DECK } from "@/sample";
 import { cardOverflow } from "./shared";
 import { apiFetch, checkPassword, getPw, savePw, imageToBg, downloadBlob } from "./api";
@@ -328,14 +328,20 @@ function StudioInner() {
         ...j.content,
         cover: { ...j.content.cover, kicker: j.content.cover.kicker?.trim() || `Weekly Insight: ${meta.issue} knot` },
       };
-      setDeck((d) => ({
-        ...(d ?? SAMPLE_DECK),
-        meta: { ...meta, title: j.title || meta.title },
-        content,
-        cards: j.cards,
-        lang: j.lang ?? d?.lang,
-        bg: d?.bg ?? SAMPLE_DECK.bg,
-      }));
+      setDeck((d) => {
+        const lang = j.lang ?? d?.lang;
+        // 카드 언어가 바뀌면 그 언어에 맞는 폰트로 시드 (사용자는 '디자인'에서 변경 가능).
+        const langChanged = lang !== (d?.lang ?? "ko");
+        return {
+          ...(d ?? SAMPLE_DECK),
+          meta: { ...meta, title: j.title || meta.title },
+          content,
+          cards: j.cards,
+          lang,
+          font: langChanged ? defaultFontFor(lang) : (d?.font ?? defaultFontFor(lang)),
+          bg: d?.bg ?? SAMPLE_DECK.bg,
+        };
+      });
       setSel(0);
       setPhase("studio");
       setNotice(t("composed", { n: j.cards.length }));
