@@ -212,7 +212,18 @@ function CarouselView({ deck, selIdx, onSel }: { deck: Deck; selIdx: number; onS
       }}
     >
       {specs.map((s, i) => (
-        <div key={s.role} style={{ flex: "none", scrollSnapAlign: "center" }}>
+        <div
+          key={s.role}
+          style={{
+            flex: "none",
+            scrollSnapAlign: "center",
+            // 지금 보고 있는(=선택된) 카드만 제 크기로 떠오르고, 양옆은 살짝
+            // 작고 흐리게 — 어떤 카드를 조정 중인지 몸으로 느껴지는 신호.
+            transform: i === selIdx ? "scale(1)" : "scale(0.93)",
+            opacity: i === selIdx ? 1 : 0.65,
+            transition: "transform .25s ease, opacity .25s ease",
+          }}
+        >
           <Thumb deck={deck} index={i} selected={i === selIdx} onSelect={() => onSel(i)} width={cardW} />
         </div>
       ))}
