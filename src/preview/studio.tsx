@@ -3,7 +3,7 @@ import JSZip from "jszip";
 import type { CardRole, Deck, DeckContent } from "@/types";
 import { CARD_ORDER, ALL_ROLES, PLATFORMS, activeSpecs, deckSize } from "@/types";
 import { RenderCard } from "@/cards/cards";
-import { zipName, kebab, cardFilename, resolvedZipName } from "@/lib/filename";
+import { resolvedZipName, resolvedCardFilename } from "@/lib/filename";
 import { FONT_CHOICES, DEFAULT_FONT_ID } from "@/design/fonts";
 import { SAMPLE_DECK } from "@/sample";
 import { cardOverflow } from "./shared";
@@ -455,29 +455,6 @@ export function Studio() {
             ) : (
               <FieldEditor value={deck.content[spec.role as keyof DeckContent]} path={[spec.role]} onSet={setContent} />
             )}
-            {(() => {
-              const custom = deck.meta.customCardNames?.[spec.role] ?? "";
-              const autoName = cardFilename(selIdx + 1, deck.meta.slug, deck.meta.issue, spec.cardname);
-              const converted = kebab(custom.trim());
-              return (
-                <Row label="이미지 파일명 (비우면 자동생성)">
-                  <input
-                    style={ui.input}
-                    placeholder={autoName.replace(".png", "")}
-                    value={custom}
-                    onChange={(e) =>
-                      patch({ meta: { ...deck.meta, customCardNames: { ...deck.meta.customCardNames, [spec.role]: e.target.value } } })
-                    }
-                  />
-                  {custom.trim() && converted !== custom.trim() && (
-                    <div style={{ fontSize: 11, color: "#C5221F", marginTop: 4 }}>변환됨 → <b>{converted || "(유효하지 않은 이름)"}</b></div>
-                  )}
-                  <div style={{ fontSize: 11, color: "#80868B", marginTop: 3, fontFamily: "monospace", wordBreak: "break-all" }}>
-                    {custom.trim() ? `${converted || "card"}.png` : autoName}
-                  </div>
-                </Row>
-              );
-            })()}
           </Panel>
 
           <Panel title="디자인" defaultOpen>
@@ -617,48 +594,34 @@ export function Studio() {
             <div style={{ fontSize: 11, color: "#80868B" }}>해제한 카드는 내보내기에서 빠지고, 파일 번호는 자동으로 당겨집니다.</div>
           </Panel>
 
-          <Panel title="호 정보">
-            <Row label="호 번호">
+          <Panel title="파일명">
+            <Row label="카드뉴스 이름 (한글 가능 — ZIP과 모든 이미지 파일명에 적용)">
+              <input
+                style={ui.input}
+                placeholder="예: my-card-news"
+                value={deck.meta.customZipName ?? ""}
+                onChange={(e) => patch({ meta: { ...deck.meta, customZipName: e.target.value } })}
+              />
+            </Row>
+            {(() => {
+              const first = specs[0];
+              const last = specs[specs.length - 1];
+              return (
+                <div style={{ fontSize: 11, color: "#80868B", fontFamily: "monospace", wordBreak: "break-all", display: "flex", flexDirection: "column", gap: 3 }}>
+                  <div>ZIP&nbsp;&nbsp;{resolvedZipName(deck)}</div>
+                  {first && <div>PNG&nbsp;&nbsp;{resolvedCardFilename(1, deck, first.role)}</div>}
+                  {specs.length > 2 && <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⋮</div>}
+                  {last && specs.length > 1 && <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{resolvedCardFilename(specs.length, deck, last.role)}</div>}
+                </div>
+              );
+            })()}
+            <Row label="호 번호 (이름을 비웠을 때의 자동 파일명에 사용)">
               <input
                 style={ui.input}
                 type="number"
                 value={deck.meta.issue}
                 onChange={(e) => patch({ meta: { ...deck.meta, issue: Number(e.target.value) || 0 } })}
               />
-            </Row>
-            <Row label="슬러그 (영문 kebab — 파일명용)">
-              <input style={ui.input} value={deck.meta.slug} onChange={(e) => patch({ meta: { ...deck.meta, slug: e.target.value } })} />
-              {(() => {
-                const converted = kebab(deck.meta.slug);
-                const raw = deck.meta.slug.trim();
-                if (!raw) return <div style={{ fontSize: 11, color: "#C5221F", marginTop: 4 }}>슬러그를 입력하면 파일명이 생성됩니다.</div>;
-                if (converted !== raw) return <div style={{ fontSize: 11, color: "#C5221F", marginTop: 4 }}>변환됨 → <b>{converted || "(빈 슬러그)"}</b></div>;
-                return null;
-              })()}
-            </Row>
-            {(() => {
-              const customZip = deck.meta.customZipName ?? "";
-              const converted = kebab(customZip.trim());
-              const autoZip = zipName(deck.meta.slug, deck.meta.issue);
-              return (
-                <Row label="ZIP 파일명 (비우면 자동생성)">
-                  <input
-                    style={ui.input}
-                    placeholder={autoZip.replace(".zip", "")}
-                    value={customZip}
-                    onChange={(e) => patch({ meta: { ...deck.meta, customZipName: e.target.value } })}
-                  />
-                  {customZip.trim() && converted !== customZip.trim() && (
-                    <div style={{ fontSize: 11, color: "#C5221F", marginTop: 4 }}>변환됨 → <b>{converted || "(유효하지 않은 이름)"}</b></div>
-                  )}
-                  <div style={{ fontSize: 11, color: "#80868B", marginTop: 3, wordBreak: "break-all", fontFamily: "monospace" }}>
-                    {resolvedZipName(deck)}
-                  </div>
-                </Row>
-              );
-            })()}
-            <Row label="제목">
-              <input style={ui.input} value={deck.meta.title} onChange={(e) => patch({ meta: { ...deck.meta, title: e.target.value } })} />
             </Row>
           </Panel>
 

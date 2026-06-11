@@ -54,17 +54,25 @@ export function zipName(slug, issue) {
   return `eigen-knot-weekly-issue-insight-${kebab(slug)}-knot-${nnn}.zip`;
 }
 
-/** Returns the effective ZIP filename, respecting the custom override if set. */
-export function resolvedZipName(deck) {
+/** The user's deck name as a filename base, or null if unset. Custom names are
+ *  download-only (never URL-served), so Korean/spaces are fine — strip only the
+ *  characters OSes forbid in filenames. */
+export function customBase(deck) {
   const custom = deck.meta?.customZipName?.trim();
-  if (custom) return `${kebab(custom) || "export"}.zip`;
-  return zipName(deck.meta.slug, deck.meta.issue);
+  if (!custom) return null;
+  return custom.replace(/[/\\:*?"<>|]+/g, "-").replace(/^[-.\s]+|[-.\s]+$/g, "") || "cards";
 }
 
-/** Returns the effective card PNG filename, respecting the per-role custom override if set. */
+/** Effective ZIP filename: {deck-name}.zip, or the legacy auto-name. */
+export function resolvedZipName(deck) {
+  const base = customBase(deck);
+  return base ? `${base}.zip` : zipName(deck.meta.slug, deck.meta.issue);
+}
+
+/** Effective card PNG filename: {NN}-{deck-name}-{cardname}.png, or the legacy auto-name. */
 export function resolvedCardFilename(seq, deck, role) {
-  const custom = deck.meta?.customCardNames?.[role]?.trim();
-  if (custom) return `${kebab(custom) || "card"}.png`;
+  const base = customBase(deck);
+  if (base) return `${String(seq).padStart(2, "0")}-${base}-${ROLE_CARDNAMES[role]}.png`;
   return cardFilename(seq, deck.meta.slug, deck.meta.issue, ROLE_CARDNAMES[role]);
 }
 
