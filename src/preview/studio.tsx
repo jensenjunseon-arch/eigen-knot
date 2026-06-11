@@ -161,8 +161,8 @@ function Thumb({
           height: Math.round(h * scale),
           overflow: "hidden",
           borderRadius: 14,
-          outline: selected ? "2px solid #4E86FF" : "1px solid rgba(255,255,255,0.08)",
-          boxShadow: selected ? "0 0 0 4px rgba(78,134,255,0.18), 0 16px 36px -20px rgba(0,0,0,.8)" : "0 14px 30px -18px rgba(0,0,0,.7)",
+          outline: selected ? "2px solid #4E86FF" : "1px solid rgba(0,0,0,0.09)",
+          boxShadow: selected ? "0 0 0 4px rgba(78,134,255,0.2), 0 8px 24px -8px rgba(66,133,244,0.25)" : "0 4px 16px -4px rgba(0,0,0,0.12)",
           transition: "outline .12s ease, box-shadow .12s ease",
         }}
       >
@@ -170,11 +170,11 @@ function Thumb({
           <RenderCard deck={deck} spec={spec} />
         </div>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11.5, color: "#9AA0A6" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11.5, color: "#5F6368" }}>
         <span>
           {String(index + 1).padStart(2, "0")} {ROLE_LABELS[spec.role]} · dim {dim.toFixed(2)}
         </span>
-        {overflow && <span style={{ color: "#F28B82" }}>⚠ 넘침</span>}
+        {overflow && <span style={{ color: "#C5221F" }}>⚠ 넘침</span>}
       </div>
     </div>
   );
@@ -202,7 +202,7 @@ function Intro({
     <div style={ui.introRoot}>
       <div style={ui.introCol}>
         <div style={ui.gradientTitle}>무엇을 카드뉴스로 만들까요?</div>
-        <div style={{ color: "#9AA0A6", fontSize: 15, textAlign: "center", margin: "12px 0 30px" }}>
+        <div style={{ color: "#5F6368", fontSize: 15, textAlign: "center", margin: "12px 0 30px" }}>
           글을 붙여넣으면 AI가 제목, 카드 구성, 장수까지 알아서 정합니다.
         </div>
 
@@ -214,7 +214,7 @@ function Intro({
             onChange={(e) => setArticle(e.target.value)}
           />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px 12px" }}>
-            <span style={{ fontSize: 12, color: "#6E727A" }}>
+            <span style={{ fontSize: 12, color: "#80868B" }}>
               {busy ? "AI가 글을 읽고 카드 구성을 설계하는 중…" : "붙여넣은 뒤 → 버튼"}
             </span>
             <button
@@ -227,8 +227,8 @@ function Intro({
                 borderRadius: "50%",
                 border: "none",
                 cursor: ready ? "pointer" : "default",
-                background: ready ? "linear-gradient(135deg,#4E86FF,#9B72F8)" : "#282A2C",
-                color: ready ? "#fff" : "#6E727A",
+                background: ready ? "linear-gradient(135deg,#4E86FF,#9B72F8)" : "#D8E3F0",
+                color: ready ? "#fff" : "#80868B",
                 fontSize: 18,
                 display: "flex",
                 alignItems: "center",
@@ -242,7 +242,7 @@ function Intro({
         </div>
 
         {notice && (
-          <div style={{ color: notice.startsWith("✗") ? "#F28B82" : "#81C995", fontSize: 13, textAlign: "center", marginTop: 14 }}>
+          <div style={{ color: notice.startsWith("✗") ? "#C5221F" : "#1E8E3E", fontSize: 13, textAlign: "center", marginTop: 14 }}>
             {notice}
           </div>
         )}
@@ -423,10 +423,10 @@ export function Studio() {
             ←
           </button>
           <span style={{ ...ui.gradientText, fontSize: 16, fontWeight: 600 }}>eigen knot</span>
-          <span style={{ color: "#6E727A", fontSize: 12.5 }}>card studio</span>
+          <span style={{ color: "#80868B", fontSize: 12.5 }}>card studio</span>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          {notice && <span style={{ fontSize: 12.5, color: notice.startsWith("✗") ? "#F28B82" : "#81C995" }}>{notice}</span>}
+          {notice && <span style={{ fontSize: 12.5, color: notice.startsWith("✗") ? "#C5221F" : "#1E8E3E" }}>{notice}</span>}
           <button style={{ ...ui.primaryPill, opacity: busy ? 0.6 : 1 }} disabled={busy !== null} onClick={runExport}>
             {busy === "export" ? `내보내는 중 ${prog}` : `PNG ${specs.length}장 내보내기`}
           </button>
@@ -529,7 +529,7 @@ export function Studio() {
                   );
                 })}
               </div>
-              <div style={{ fontSize: 11, color: "#6E727A", marginTop: 6 }}>
+              <div style={{ fontSize: 11, color: "#80868B", marginTop: 6 }}>
                 현재 {w}×{h}px — 사이즈를 바꾸면 ⚠ 넘침 표시를 확인하세요.
               </div>
             </Row>
@@ -574,7 +574,7 @@ export function Studio() {
                 return (
                   <label
                     key={s.role}
-                    style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer", color: on ? "#E3E3E3" : "#6E727A" }}
+                    style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer", color: on ? "#1A1C22" : "#80868B" }}
                   >
                     <input
                       type="checkbox"
@@ -591,7 +591,7 @@ export function Studio() {
                 );
               })}
             </div>
-            <div style={{ fontSize: 11, color: "#6E727A" }}>해제한 카드는 내보내기에서 빠지고, 파일 번호는 자동으로 당겨집니다.</div>
+            <div style={{ fontSize: 11, color: "#80868B" }}>해제한 카드는 내보내기에서 빠지고, 파일 번호는 자동으로 당겨집니다.</div>
           </Panel>
 
           <Panel title="호 정보">
@@ -662,7 +662,7 @@ function LoginGate({ onUnlock }: { onUnlock: () => void }) {
     <div style={ui.gate}>
       <div style={ui.gateCard}>
         <div style={{ ...ui.gradientText, fontSize: 24, fontWeight: 600 }}>eigen knot</div>
-        <div style={{ color: "#9AA0A6", fontSize: 13, margin: "8px 0 22px" }}>비밀번호를 입력하세요</div>
+        <div style={{ color: "#5F6368", fontSize: 13, margin: "8px 0 22px" }}>비밀번호를 입력하세요</div>
         <input
           type="password"
           autoFocus
@@ -688,7 +688,7 @@ function Panel({ title, children, defaultOpen = false }: { title: string; childr
     <section style={ui.panel}>
       <button onClick={() => setOpen((o) => !o)} style={ui.panelHead}>
         <span>{title}</span>
-        <span style={{ color: "#6E727A", fontSize: 11 }}>{open ? "▾" : "▸"}</span>
+        <span style={{ color: "#80868B", fontSize: 11 }}>{open ? "▾" : "▸"}</span>
       </button>
       {open && <div style={{ display: "flex", flexDirection: "column", gap: 11, padding: "2px 14px 14px" }}>{children}</div>}
     </section>
@@ -703,11 +703,17 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/* ── Gemini풍 다크 UI 토큰 ──────────────────────────────────────────────── */
+/* ── Gemini 라이트 UI 토큰 ───────────────────────────────────────────────
+   Gemini 배경: 상단에서 파란 글로우가 퍼져 내려오는 화이트-블루 그라데이션.
+   서피스는 반투명 흰색 유리 패널(glassmorphism). 텍스트는 Google 다크톤.
+   ─────────────────────────────────────────────────────────────────────── */
 const GRADIENT = "linear-gradient(90deg,#4E86FF 0%,#9B72F8 55%,#F66B97 100%)";
+// 상단 중앙에서 파란 빛이 퍼져 아래로 흰색으로 빠지는 Gemini 특유의 배경.
+const PAGE_BG =
+  "radial-gradient(ellipse 90% 60% at 50% 0%, #C0DAFF 0%, #D8ECFF 28%, #EBF5FF 55%, #F4FAFF 100%)";
 
 const ui: Record<string, CSSProperties> = {
-  root: { minHeight: "100vh", background: "#131314", color: "#E3E3E3", fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif" },
+  root: { minHeight: "100vh", background: PAGE_BG, color: "#1A1C22", fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif" },
   gradientText: { backgroundImage: GRADIENT, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" },
   gradientTitle: {
     backgroundImage: GRADIENT,
@@ -719,23 +725,24 @@ const ui: Record<string, CSSProperties> = {
     textAlign: "center",
     letterSpacing: "-0.01em",
   },
-  gate: { position: "fixed", inset: 0, background: "#131314", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" },
-  gateCard: { width: 330, padding: 30, background: "#1E1F20", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 22 },
-  introRoot: { minHeight: "100vh", background: "#131314", color: "#E3E3E3", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif", padding: 24 },
+  gate: { position: "fixed", inset: 0, background: PAGE_BG, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" },
+  gateCard: { width: 330, padding: 30, background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 22, boxShadow: "0 4px 28px rgba(66,133,244,0.1)" },
+  introRoot: { minHeight: "100vh", background: PAGE_BG, color: "#1A1C22", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif", padding: 24 },
   introCol: { width: "min(760px, 94vw)" },
   introBox: {
-    background: "#1E1F20",
-    border: "1px solid rgba(255,255,255,0.08)",
+    background: "rgba(255,255,255,0.88)",
+    border: "1px solid rgba(0,0,0,0.08)",
     borderRadius: 26,
     overflow: "hidden",
-    boxShadow: "0 30px 90px -45px rgba(0,0,0,.9)",
+    backdropFilter: "blur(18px)",
+    boxShadow: "0 8px 40px rgba(66,133,244,0.12), 0 2px 8px rgba(0,0,0,0.04)",
   },
   introTextarea: {
     width: "100%",
     boxSizing: "border-box",
     minHeight: 190,
     background: "transparent",
-    color: "#E3E3E3",
+    color: "#1A1C22",
     border: "none",
     outline: "none",
     padding: "20px 18px 10px",
@@ -752,15 +759,15 @@ const ui: Record<string, CSSProperties> = {
     justifyContent: "space-between",
     alignItems: "center",
     padding: "12px 22px",
-    background: "rgba(19,19,20,0.85)",
-    backdropFilter: "blur(12px)",
-    borderBottom: "1px solid rgba(255,255,255,0.06)",
+    background: "rgba(224,240,255,0.82)",
+    backdropFilter: "blur(14px)",
+    borderBottom: "1px solid rgba(0,0,0,0.07)",
   },
   cols: { display: "flex", gap: 26, padding: "20px 22px 90px", alignItems: "flex-start" },
   side: { width: 350, flex: "none", position: "sticky", top: 66, maxHeight: "calc(100vh - 84px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, paddingRight: 4 },
-  // flexShrink 0이 없으면 사이드바(maxHeight+overflow:auto flex column)가
-  // 스크롤되는 대신 패널들을 찌그러뜨려서 아래 내용이 잘린다.
-  panel: { background: "#1E1F20", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, overflow: "hidden", flexShrink: 0 },
+  // flexShrink:0 필수 — 없으면 maxHeight+overflow:auto flex column에서 패널이
+  // 스크롤 대신 찌그러져 아래 내용이 잘린다.
+  panel: { background: "rgba(255,255,255,0.82)", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 18, overflow: "hidden", flexShrink: 0, backdropFilter: "blur(10px)" },
   panelHead: {
     width: "100%",
     display: "flex",
@@ -772,16 +779,16 @@ const ui: Record<string, CSSProperties> = {
     cursor: "pointer",
     fontSize: 13,
     fontWeight: 600,
-    color: "#C7CAD1",
+    color: "#2D3142",
     textAlign: "left",
   },
-  fieldLabel: { fontSize: 11.5, color: "#9AA0A6", marginBottom: 5 },
+  fieldLabel: { fontSize: 11.5, color: "#5F6368", marginBottom: 5 },
   input: {
     width: "100%",
     boxSizing: "border-box",
-    background: "#282A2C",
-    color: "#E3E3E3",
-    border: "1px solid transparent",
+    background: "#EDF2FA",
+    color: "#1A1C22",
+    border: "1px solid rgba(0,0,0,0.09)",
     borderRadius: 12,
     padding: "8px 11px",
     fontSize: 13.5,
@@ -790,9 +797,9 @@ const ui: Record<string, CSSProperties> = {
   textarea: {
     width: "100%",
     boxSizing: "border-box",
-    background: "#282A2C",
-    color: "#E3E3E3",
-    border: "1px solid transparent",
+    background: "#EDF2FA",
+    color: "#1A1C22",
+    border: "1px solid rgba(0,0,0,0.09)",
     borderRadius: 12,
     padding: "8px 11px",
     fontSize: 13.5,
@@ -813,36 +820,36 @@ const ui: Record<string, CSSProperties> = {
     cursor: "pointer",
   },
   ghostBtn: {
-    background: "#282A2C",
-    color: "#C7CAD1",
-    border: "1px solid rgba(255,255,255,0.08)",
+    background: "#EDF2FA",
+    color: "#2D3142",
+    border: "1px solid rgba(0,0,0,0.1)",
     borderRadius: 999,
     padding: "7px 13px",
     fontSize: 12.5,
     cursor: "pointer",
   },
   chip: {
-    background: "#282A2C",
-    color: "#C7CAD1",
-    border: "1px solid rgba(255,255,255,0.08)",
+    background: "#EDF2FA",
+    color: "#2D3142",
+    border: "1px solid rgba(0,0,0,0.1)",
     borderRadius: 999,
     padding: "5px 12px",
     fontSize: 11.5,
     cursor: "pointer",
   },
   chipLg: {
-    background: "#1E1F20",
-    color: "#C7CAD1",
-    border: "1px solid rgba(255,255,255,0.1)",
+    background: "rgba(255,255,255,0.78)",
+    color: "#2D3142",
+    border: "1px solid rgba(0,0,0,0.1)",
     borderRadius: 999,
     padding: "10px 18px",
     fontSize: 13.5,
     cursor: "pointer",
   },
   iconPill: {
-    background: "#1E1F20",
-    color: "#C7CAD1",
-    border: "1px solid rgba(255,255,255,0.08)",
+    background: "rgba(255,255,255,0.78)",
+    color: "#2D3142",
+    border: "1px solid rgba(0,0,0,0.1)",
     borderRadius: 999,
     width: 34,
     height: 34,
@@ -851,8 +858,8 @@ const ui: Record<string, CSSProperties> = {
   },
   iconBtn: {
     background: "transparent",
-    color: "#9AA0A6",
-    border: "1px solid rgba(255,255,255,0.12)",
+    color: "#5F6368",
+    border: "1px solid rgba(0,0,0,0.14)",
     borderRadius: 8,
     width: 26,
     height: 26,
