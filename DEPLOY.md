@@ -36,9 +36,10 @@
 ## 문제 해결
 
 - **AI 초안 400 (크레딧/키)**: `ANTHROPIC_API_KEY`가 설정됐는지, 크레딧이 있는지 확인.
-- **캡처 500 (브라우저 실행 실패)**: `@sparticuz/chromium`(Chromium 130)과
-  `playwright-core@1.48`은 맞춰져 있음. 그래도 실패하면 함수 `memory`를 2048~3009로
-  올리거나, Vercel 빌드에 `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`(이미 `vercel.json`에
-  설정됨)이 적용됐는지 확인.
+- **캡처 500 (브라우저 실행 실패)**: `@sparticuz/chromium@133`(Chromium 133)과
+  `playwright-core@1.50`은 CDP 프로토콜이 맞춰진 쌍입니다 — 한쪽만 올리면
+  "Target ... has been closed"로 죽습니다. 그래도 실패하면 함수 `memory`를
+  2048~3009로 올리거나, Vercel 빌드에 `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`(이미
+  `vercel.json`에 설정됨)이 적용됐는지 확인.
 - **로컬 vs 배포**: 로컬 `npm run dev`는 풀 `playwright`(맥에서 동작), 배포는
   서버리스 크로미움 — 같은 캡처 코어(`capture/serverless.mjs`)를 공유합니다.

@@ -14,3 +14,15 @@ img, svg { display: block; }
 .ek-balance { text-wrap: balance; }
 /* Quotes / the watermark must never wrap (PRD §2.2, §11.7). */
 .ek-nowrap { white-space: nowrap; }
+
+/* Studio responsive: stack the sidebar above the card grid on phones.
+   (Studio styles are inline → !important is required to win here.) */
+@media (max-width: 760px) {
+  .ek-cols { flex-direction: column; }
+  .ek-side {
+    position: static !important;
+    width: 100% !important;
+    max-height: none !important;
+    padding-right: 0 !important;
+  }
+}

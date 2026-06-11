@@ -65,6 +65,13 @@ const ACCENT_PRESETS = [
 
 type Path = (string | number)[];
 
+// 알림 색: ✗ 빨강 · ⚠ 주황 · ✓ 초록.
+function noticeColor(notice: string): string {
+  if (notice.startsWith("✗")) return "#C5221F";
+  if (notice.startsWith("⚠")) return "#E37400";
+  return "#1E8E3E";
+}
+
 function setAtPath<T>(obj: T, path: Path, value: unknown): T {
   if (path.length === 0) return value as T;
   const [head, ...rest] = path;
@@ -242,7 +249,7 @@ function Intro({
         </div>
 
         {notice && (
-          <div style={{ color: notice.startsWith("✗") ? "#C5221F" : "#1E8E3E", fontSize: 13, textAlign: "center", marginTop: 14 }}>
+          <div style={{ color: noticeColor(notice), fontSize: 13, textAlign: "center", marginTop: 14 }}>
             {notice}
           </div>
         )}
@@ -329,9 +336,10 @@ export function Studio() {
         body: text,
         meta,
       });
+      // 모델이 쓴 킥커를 살린다 — 비어 있을 때만 기본 문구로 채움.
       const content: DeckContent = {
         ...j.content,
-        cover: { ...j.content.cover, kicker: `Weekly Insight: ${meta.issue} knot` },
+        cover: { ...j.content.cover, kicker: j.content.cover.kicker?.trim() || `Weekly Insight: ${meta.issue} knot` },
       };
       setDeck((d) => ({
         ...(d ?? SAMPLE_DECK),
@@ -361,10 +369,15 @@ export function Studio() {
       let anyOverflow = false;
       for (let i = 0; i < n; i++) {
         setProg(`${i + 1}/${n}`);
-        const card = await apiFetch<{ name: string; b64: string; overflow: boolean }>("/api/capture-card", {
-          deck,
-          index: i,
-        });
+        // 일시적 네트워크/콜드스타트 오류로 10장짜리 내보내기가 통째로 죽지 않게
+        // 카드마다 1번 재시도.
+        let card: { name: string; b64: string; overflow: boolean };
+        try {
+          card = await apiFetch("/api/capture-card", { deck, index: i });
+        } catch {
+          setProg(`${i + 1}/${n} 재시도`);
+          card = await apiFetch("/api/capture-card", { deck, index: i });
+        }
         zip.file(card.name, card.b64, { base64: true });
         if (card.overflow) anyOverflow = true;
       }
@@ -426,16 +439,16 @@ export function Studio() {
           <span style={{ color: "#80868B", fontSize: 12.5 }}>card studio</span>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          {notice && <span style={{ fontSize: 12.5, color: notice.startsWith("✗") ? "#C5221F" : "#1E8E3E" }}>{notice}</span>}
+          {notice && <span style={{ fontSize: 12.5, color: noticeColor(notice) }}>{notice}</span>}
           <button style={{ ...ui.primaryPill, opacity: busy ? 0.6 : 1 }} disabled={busy !== null} onClick={runExport}>
             {busy === "export" ? `내보내는 중 ${prog}` : `PNG ${specs.length}장 내보내기`}
           </button>
         </div>
       </header>
 
-      <div style={ui.cols}>
+      <div className="ek-cols" style={ui.cols}>
         {/* ── 좌측 패널 ── */}
-        <aside style={ui.side}>
+        <aside className="ek-side" style={ui.side}>
           <Panel title={`카드 편집 — ${String(selIdx + 1).padStart(2, "0")} ${ROLE_LABELS[spec.role]}`} defaultOpen>
             <Row label={`이 카드 dim · ${selDim.toFixed(2)}`}>
               <input
@@ -620,7 +633,8 @@ export function Studio() {
                 style={ui.input}
                 type="number"
                 value={deck.meta.issue}
-                onChange={(e) => patch({ meta: { ...deck.meta, issue: Number(e.target.value) || 0 } })}
+                min={1}
+                onChange={(e) => patch({ meta: { ...deck.meta, issue: Math.max(1, Math.round(Number(e.target.value)) || 1) } })}
               />
             </Row>
           </Panel>
