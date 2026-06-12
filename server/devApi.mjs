@@ -100,12 +100,12 @@ export function devApi() {
               });
             }
             process.env.ANTHROPIC_API_KEY = key;
-            const { body, meta, model } = await readJsonBody(req, 4);
-            if (!body?.trim()) return sendJson(res, 400, { error: "본문이 비어 있습니다." });
-            if (body.length > 50_000)
+            const { body, meta, model, media } = await readJsonBody(req, 8);
+            if (!body?.trim() && !media?.length) return sendJson(res, 400, { error: "본문이 비어 있습니다." });
+            if (body && body.length > 50_000)
               return sendJson(res, 400, { error: `본문이 너무 깁니다 (${body.length.toLocaleString()}자). 50,000자 이하로 줄여 주세요.` });
             const { analyzeArticle } = await import("../content/analyze.mjs");
-            const result = await analyzeArticle(body, meta, { model: model || "sonnet" });
+            const result = await analyzeArticle(body, meta, { model: model || "sonnet", media: media || [] });
             return sendJson(res, 200, result); // { title, cards, content }
           } catch (e) {
             return sendJson(res, 500, { error: String(e?.message ?? e) });

@@ -58,6 +58,37 @@ export function imageToBg(file: File, maxPx = 1440, quality = 0.82): Promise<str
   });
 }
 
+/* ── 첨부 원고 (이미지/PDF) → Claude 멀티모달 입력 ─────────────────────────
+   이미지는 ≤1568px JPEG로 줄여(비전 입력 최적 크기 + Vercel 4.5MB 본문 한도),
+   PDF는 원본 그대로 base64 (3MB 상한). */
+export interface MediaAttachment {
+  media_type: string;
+  data: string; // base64, dataURL 접두사 없이
+  name: string;
+}
+
+const PDF_MAX_BYTES = 3 * 1024 * 1024;
+
+export async function fileToMedia(
+  file: File,
+  msg: { pdfTooBig: string; unsupported: string },
+): Promise<MediaAttachment> {
+  if (file.type === "application/pdf") {
+    if (file.size > PDF_MAX_BYTES) throw new Error(msg.pdfTooBig);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    }
+    return { media_type: "application/pdf", data: btoa(bin), name: file.name };
+  }
+  if (file.type.startsWith("image/") && file.type !== "image/svg+xml") {
+    const dataUrl = await imageToBg(file, 1568, 0.85);
+    return { media_type: "image/jpeg", data: dataUrl.split(",")[1], name: file.name };
+  }
+  throw new Error(msg.unsupported);
+}
+
 // Generated image (base64) → downscaled JPEG dataURL, same pipeline as uploads
 // so the capture POST stays small.
 export function b64ToBg(b64: string, mime: string, maxPx = 1440, quality = 0.82): Promise<string> {

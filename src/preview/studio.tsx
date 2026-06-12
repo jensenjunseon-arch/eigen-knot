@@ -7,7 +7,7 @@ import { resolvedZipName, resolvedCardFilename } from "@/lib/filename";
 import { FONT_CHOICES, DEFAULT_FONT_ID, defaultFontFor } from "@/design/fonts";
 import { SAMPLE_DECK } from "@/sample";
 import { cardOverflow } from "./shared";
-import { apiFetch, checkPassword, getPw, savePw, imageToBg, b64ToBg, downloadBlob } from "./api";
+import { apiFetch, checkPassword, getPw, savePw, imageToBg, b64ToBg, downloadBlob, fileToMedia, type MediaAttachment } from "./api";
 import { abstractBg, randomSeed } from "@/lib/abstractBg";
 import { I18nProvider, LangSwitch, useI18n } from "./i18n";
 
@@ -326,6 +326,57 @@ function GalleryView({
 }
 
 /* ── 인트로: 글만 던지면 AI가 전부 결정 ─────────────────────────────────── */
+/* ── 원고 첨부 (이미지/PDF) — AI가 읽고 카드로 만든다 ──────────────────── */
+function AttachControl({ media, setMedia }: { media: MediaAttachment[]; setMedia: (m: MediaAttachment[]) => void }) {
+  const { t } = useI18n();
+  const [err, setErr] = useState<string | null>(null);
+  const onPick = async (files: FileList | null) => {
+    if (!files) return;
+    setErr(null);
+    const next = [...media];
+    for (const f of Array.from(files)) {
+      if (next.length >= 3) {
+        setErr(t("attachMax"));
+        break;
+      }
+      try {
+        next.push(await fileToMedia(f, { pdfTooBig: t("attachPdfTooBig"), unsupported: t("attachUnsupported") }));
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
+      }
+    }
+    setMedia(next);
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      <label style={{ ...ui.chip, cursor: "pointer" }} title={t("attachHint")}>
+        {t("attachFile")}
+        <input
+          type="file"
+          accept="image/*,application/pdf"
+          multiple
+          hidden
+          onChange={(e) => {
+            void onPick(e.target.files);
+            e.target.value = "";
+          }}
+        />
+      </label>
+      {media.map((m, i) => (
+        <span key={i} style={{ ...ui.chip, display: "inline-flex", alignItems: "center", gap: 6, maxWidth: 190 }}>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {m.media_type === "application/pdf" ? "📄" : "🖼"} {m.name}
+          </span>
+          <span style={{ cursor: "pointer", fontWeight: 700 }} onClick={() => setMedia(media.filter((_, j) => j !== i))}>
+            ×
+          </span>
+        </span>
+      ))}
+      {err && <span style={{ fontSize: 12, color: "#C5221F" }}>{err}</span>}
+    </div>
+  );
+}
+
 function Intro({
   hasSaved,
   onContinue,
@@ -336,14 +387,15 @@ function Intro({
 }: {
   hasSaved: boolean;
   onContinue: () => void;
-  onAI: (article: string) => void;
+  onAI: (article: string, media: MediaAttachment[]) => void;
   onSample: () => void;
   busy: boolean;
   notice: string | null;
 }) {
   const { t } = useI18n();
   const [article, setArticle] = useState("");
-  const ready = article.trim().length > 0 && !busy;
+  const [media, setMedia] = useState<MediaAttachment[]>([]);
+  const ready = (article.trim().length > 0 || media.length > 0) && !busy;
   return (
     <div style={ui.introRoot}>
       <LangSwitch style={{ position: "fixed", top: 14, right: 14, zIndex: 20 }} />
@@ -360,14 +412,16 @@ function Intro({
             value={article}
             onChange={(e) => setArticle(e.target.value)}
           />
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px 12px" }}>
-            <span style={{ fontSize: 12, color: "#80868B" }}>
-              {busy ? t("introBusy") : ""}
-            </span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "0 14px 12px" }}>
+            {busy ? (
+              <span style={{ fontSize: 12, color: "#80868B" }}>{t("introBusy")}</span>
+            ) : (
+              <AttachControl media={media} setMedia={setMedia} />
+            )}
             <button
               title={t("aiMakeCards")}
               disabled={!ready}
-              onClick={() => onAI(article)}
+              onClick={() => onAI(article, media)}
               style={{
                 width: 40,
                 height: 40,
@@ -437,6 +491,7 @@ function StudioInner() {
   const [article, setArticle] = useState("");
   const [busy, setBusy] = useState<null | "ai" | "export" | "bg">(null);
   const [bgPrompt, setBgPrompt] = useState("");
+  const [reMedia, setReMedia] = useState<MediaAttachment[]>([]);
   const [prog, setProg] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [shareFiles, setShareFiles] = useState<File[] | null>(null);
@@ -481,8 +536,8 @@ function StudioInner() {
   const patch = (p: Partial<Deck>) => setDeck((d) => (d ? { ...d, ...p } : d));
 
   /* AI — 인트로: 새 호 생성(제목·구성 자동) / 스튜디오: 내용 재작성 */
-  const runAI = async (text: string, fresh: boolean) => {
-    if (!text.trim()) return;
+  const runAI = async (text: string, fresh: boolean, media: MediaAttachment[] = []) => {
+    if (!text.trim() && !media.length) return;
     setBusy("ai");
     setNotice(null);
     // 비워둔 호 번호는 비운 채로 둔다 (파일명·끝맺음 문구에서 자동 생략).
@@ -496,6 +551,7 @@ function StudioInner() {
       const j = await apiFetch<{ title: string; cards: CardRole[]; content: DeckContent; lang?: string; bgPrompt?: string }>("/api/analyze", {
         body: text,
         meta,
+        media,
       });
       // AI가 글에서 뽑은 배경 장면 제안 — 배경 패널에 미리 채워, 한 번의 클릭으로
       // '딱 맞는' 이미지가 나오게 한다.
@@ -619,7 +675,7 @@ function StudioInner() {
       <Intro
         hasSaved={!!deck}
         onContinue={() => setPhase("studio")}
-        onAI={(text) => void runAI(text, true)}
+        onAI={(text, media) => void runAI(text, true, media)}
         onSample={() => {
           setDeck((d) => d ?? SAMPLE_DECK);
           setPhase("studio");
@@ -893,10 +949,11 @@ function StudioInner() {
               value={article}
               onChange={(e) => setArticle(e.target.value)}
             />
+            <AttachControl media={reMedia} setMedia={setReMedia} />
             <button
-              style={{ ...ui.primaryPill, width: "100%", opacity: busy || !article.trim() ? 0.55 : 1 }}
-              disabled={busy !== null || !article.trim()}
-              onClick={() => void runAI(article, false)}
+              style={{ ...ui.primaryPill, width: "100%", opacity: busy || (!article.trim() && !reMedia.length) ? 0.55 : 1 }}
+              disabled={busy !== null || (!article.trim() && !reMedia.length)}
+              onClick={() => void runAI(article, false, reMedia)}
             >
               {busy === "ai" ? t("analyzing") : t("reAiButton")}
             </button>

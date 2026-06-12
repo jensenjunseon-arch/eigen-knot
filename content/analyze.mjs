@@ -129,6 +129,8 @@ const SYSTEM = `You are the card-news editor for the newsletter "eigen knot". Yo
 - Write ALL card text in the same language as the article. Korean article → Korean cards; English article → English cards; Japanese → Japanese; and so on. Never translate.
 - Report that language as a BCP-47 code in \`lang\` (e.g. "ko", "en", "ja").
 - definition slot: term_ko = the term in the ARTICLE's language (the field name '_ko' is legacy — never translate the term to Korean for a non-Korean article); term_en = a short English rendering. If the article is already English, term_en is a concise etymology or alternate phrasing.
+[Attached source]
+- The article may arrive as attached image(s) or a PDF instead of (or alongside) pasted text — a photo of a book page, a scan, a screenshot, slides. Read it faithfully (OCR if needed); the attachment IS the article. Ignore page furniture: headers, footers, page numbers, ads, navigation chrome.
 [Background photo suggestion]
 - In \`bg_prompt\`, propose ONE concrete photographable scene that carries the article's emotional core — a specific place, light, weather, or object (not an abstract concept, no text, no faces). Written in the article's language. The reader should feel "yes, THIS image" the moment they see the deck. Think like a film director choosing the establishing shot for this story.
 [Line breaks & expression — per language]
@@ -181,14 +183,23 @@ Manual line breaks (\\n) in headlines must follow each language's own rules:
 
 Respond ONLY via the emit_deck tool.`;
 
-export async function analyzeArticle(body, meta, { model = "sonnet" } = {}) {
+export async function analyzeArticle(body, meta, { model = "sonnet", media = [] } = {}) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not set. `export ANTHROPIC_API_KEY=sk-...` or pass manual content via --deck <content.json>.");
   }
   const client = new Anthropic({ apiKey });
   const modelId = MODELS[model] ?? model;
-  const userText = `Issue number: ${meta.issue ?? ""}\nTitle hint: ${meta.title}\nSlug: ${meta.slug}\n\n[Article]\n${body}`;
+  const articleText =
+    body?.trim() || "(The article is in the attached file(s). Read them — OCR if it is a photo or scan — and use their text as the article.)";
+  const userText = `Issue number: ${meta.issue ?? ""}\nTitle hint: ${meta.title}\nSlug: ${meta.slug}\n\n[Article]\n${articleText}`;
+
+  // 첨부(이미지/PDF)는 텍스트 앞에 멀티모달 블록으로 붙는다.
+  const mediaBlocks = media.map((m) =>
+    m.media_type === "application/pdf"
+      ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: m.data } }
+      : { type: "image", source: { type: "base64", media_type: m.media_type, data: m.data } },
+  );
 
   const res = await client.messages.create({
     model: modelId,
@@ -196,7 +207,7 @@ export async function analyzeArticle(body, meta, { model = "sonnet" } = {}) {
     system: SYSTEM,
     tools: [{ name: "emit_deck", description: "Return the structured card-news deck content.", input_schema: DECK_SCHEMA }],
     tool_choice: { type: "tool", name: "emit_deck" },
-    messages: [{ role: "user", content: userText }],
+    messages: [{ role: "user", content: [...mediaBlocks, { type: "text", text: userText }] }],
   });
 
   const tool = res.content.find((b) => b.type === "tool_use");
