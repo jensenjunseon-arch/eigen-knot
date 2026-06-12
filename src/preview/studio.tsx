@@ -20,14 +20,14 @@ import { I18nProvider, LangSwitch, useI18n } from "./i18n";
 const STORE_KEY = "ek-studio-v1";
 const BODY_ROLES: CardRole[] = ["summary", "definition", "compare", "diagnosis", "analysis", "grid", "claim", "conclusion"];
 
-// Modern accent palette (tones that stay crisp on dark photos). Labels live in i18n.
+// 2025 trend accent palette. Labels live in i18n.
 const ACCENT_PRESETS = [
-  { id: "rose", value: "#FB7185" },
-  { id: "violet", value: "#A78BFA" },
-  { id: "sky", value: "#38BDF8" },
-  { id: "emerald", value: "#34D399" },
-  { id: "amber", value: "#FBBF24" },
-  { id: "wine", value: "#C44058" },
+  { id: "teaberry", value: "#D44B6A" },     // Teaberry — berry crimson
+  { id: "banana", value: "#EFE080" },        // Pale Banana — soft lemon
+  { id: "amethyst", value: "#9A86C8" },      // Amethyst Orchid — periwinkle purple
+  { id: "mandarin", value: "#E57B42" },      // Mandarin Orange — warm terracotta
+  { id: "tickled", value: "#F0A8BC" },       // Tickled Pink — blush
+  { id: "caramel", value: "#C98A50" },       // Caramel — warm sand
 ];
 
 type Path = (string | number)[];
@@ -694,7 +694,7 @@ function StudioInner() {
   const { w, h } = deckSize(deck);
   const bodyDim = deck.dims?.summary ?? 0.9;
   const selDim = deck.dims?.[spec.role] ?? spec.dim;
-  const accent = deck.accent ?? "#C44058";
+  const accent = deck.accent ?? "#D44B6A";
 
   return (
     <div style={ui.root}>
