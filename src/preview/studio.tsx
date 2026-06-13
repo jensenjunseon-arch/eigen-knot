@@ -327,10 +327,18 @@ function GalleryView({
 
 /* ── 인트로: 글만 던지면 AI가 전부 결정 ─────────────────────────────────── */
 /* ── 원고 첨부 (이미지/PDF) — AI가 읽고 카드로 만든다 ──────────────────── */
-function AttachControl({ media, setMedia }: { media: MediaAttachment[]; setMedia: (m: MediaAttachment[]) => void }) {
+// 첨부(이미지/PDF) 상태 + 파일 추가 로직. 버튼 선택과 드래그앤드롭이 공유한다.
+interface Attach {
+  media: MediaAttachment[];
+  setMedia: (m: MediaAttachment[]) => void;
+  err: string | null;
+  addFiles: (files: FileList | File[] | null) => Promise<void>;
+}
+function useAttachments(): Attach {
   const { t } = useI18n();
+  const [media, setMedia] = useState<MediaAttachment[]>([]);
   const [err, setErr] = useState<string | null>(null);
-  const onPick = async (files: FileList | null) => {
+  const addFiles = async (files: FileList | File[] | null) => {
     if (!files) return;
     setErr(null);
     const next = [...media];
@@ -347,6 +355,76 @@ function AttachControl({ media, setMedia }: { media: MediaAttachment[]; setMedia
     }
     setMedia(next);
   };
+  return { media, setMedia, err, addFiles };
+}
+
+// 자식을 감싸 파일 드롭존으로 만든다. 드래그 중에만 점선 오버레이를 띄운다.
+// dragenter/leave는 자식 위에서도 발화하므로 카운터로 경계를 추적한다.
+function DropZone({ att, children, style }: { att: Attach; children: ReactNode; style?: CSSProperties }) {
+  const { t } = useI18n();
+  const [over, setOver] = useState(false);
+  const depth = useRef(0);
+  const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes("Files");
+  return (
+    <div
+      style={{ position: "relative", ...style }}
+      onDragEnter={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        depth.current += 1;
+        setOver(true);
+      }}
+      onDragOver={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }}
+      onDragLeave={(e) => {
+        if (!hasFiles(e)) return;
+        depth.current -= 1;
+        if (depth.current <= 0) {
+          depth.current = 0;
+          setOver(false);
+        }
+      }}
+      onDrop={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        depth.current = 0;
+        setOver(false);
+        void att.addFiles(e.dataTransfer.files);
+      }}
+    >
+      {children}
+      {over && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: "inherit",
+            border: "2px dashed #4E86FF",
+            background: "rgba(78,134,255,0.10)",
+            backdropFilter: "blur(1px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#2D5BC8",
+            fontSize: 14,
+            fontWeight: 600,
+            pointerEvents: "none",
+            zIndex: 5,
+          }}
+        >
+          {t("dropHint")}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AttachControl({ att }: { att: Attach }) {
+  const { t } = useI18n();
+  const { media, setMedia, err, addFiles } = att;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
       <label style={{ ...ui.chip, cursor: "pointer" }} title={t("attachHint")}>
@@ -357,7 +435,7 @@ function AttachControl({ media, setMedia }: { media: MediaAttachment[]; setMedia
           multiple
           hidden
           onChange={(e) => {
-            void onPick(e.target.files);
+            void addFiles(e.target.files);
             e.target.value = "";
           }}
         />
@@ -394,8 +472,8 @@ function Intro({
 }) {
   const { t } = useI18n();
   const [article, setArticle] = useState("");
-  const [media, setMedia] = useState<MediaAttachment[]>([]);
-  const ready = (article.trim().length > 0 || media.length > 0) && !busy;
+  const att = useAttachments();
+  const ready = (article.trim().length > 0 || att.media.length > 0) && !busy;
   return (
     <div style={ui.introRoot}>
       <LangSwitch style={{ position: "fixed", top: 14, right: 14, zIndex: 20 }} />
@@ -405,7 +483,7 @@ function Intro({
           {t("introSub")}
         </div>
 
-        <div style={ui.introBox}>
+        <DropZone att={att} style={ui.introBox}>
           <textarea
             style={ui.introTextarea}
             placeholder={t("introPlaceholder")}
@@ -416,12 +494,12 @@ function Intro({
             {busy ? (
               <span style={{ fontSize: 12, color: "#80868B" }}>{t("introBusy")}</span>
             ) : (
-              <AttachControl media={media} setMedia={setMedia} />
+              <AttachControl att={att} />
             )}
             <button
               title={t("aiMakeCards")}
               disabled={!ready}
-              onClick={() => onAI(article, media)}
+              onClick={() => onAI(article, att.media)}
               style={{
                 width: 40,
                 height: 40,
@@ -440,7 +518,7 @@ function Intro({
               {busy ? "…" : "↑"}
             </button>
           </div>
-        </div>
+        </DropZone>
 
         {notice && (
           <div style={{ color: noticeColor(notice), fontSize: 13, textAlign: "center", marginTop: 14 }}>
@@ -491,7 +569,7 @@ function StudioInner() {
   const [article, setArticle] = useState("");
   const [busy, setBusy] = useState<null | "ai" | "export" | "bg">(null);
   const [bgPrompt, setBgPrompt] = useState("");
-  const [reMedia, setReMedia] = useState<MediaAttachment[]>([]);
+  const reAtt = useAttachments();
   const [prog, setProg] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [shareFiles, setShareFiles] = useState<File[] | null>(null);
@@ -943,17 +1021,19 @@ function StudioInner() {
           </Panel>
 
           <Panel title={t("reAi")}>
-            <textarea
-              style={{ ...ui.textarea, minHeight: 90 }}
-              placeholder={t("reAiPlaceholder")}
-              value={article}
-              onChange={(e) => setArticle(e.target.value)}
-            />
-            <AttachControl media={reMedia} setMedia={setReMedia} />
+            <DropZone att={reAtt} style={{ borderRadius: 12 }}>
+              <textarea
+                style={{ ...ui.textarea, minHeight: 90 }}
+                placeholder={t("reAiPlaceholder")}
+                value={article}
+                onChange={(e) => setArticle(e.target.value)}
+              />
+            </DropZone>
+            <AttachControl att={reAtt} />
             <button
-              style={{ ...ui.primaryPill, width: "100%", opacity: busy || (!article.trim() && !reMedia.length) ? 0.55 : 1 }}
-              disabled={busy !== null || (!article.trim() && !reMedia.length)}
-              onClick={() => void runAI(article, false, reMedia)}
+              style={{ ...ui.primaryPill, width: "100%", opacity: busy || (!article.trim() && !reAtt.media.length) ? 0.55 : 1 }}
+              disabled={busy !== null || (!article.trim() && !reAtt.media.length)}
+              onClick={() => void runAI(article, false, reAtt.media)}
             >
               {busy === "ai" ? t("analyzing") : t("reAiButton")}
             </button>
