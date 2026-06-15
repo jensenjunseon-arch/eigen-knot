@@ -14,6 +14,9 @@
     "api/analyze.js": {
       "maxDuration": 60
     },
+    "api/caption.js": {
+      "maxDuration": 60
+    },
     "api/generate-bg.js": {
       "maxDuration": 60
     }

@@ -159,6 +159,27 @@ export function devApi() {
           }
         }
 
+        /* ── caption + hashtags (Claude) ─────────────────────────── */
+        if (req.method === "POST" && url.pathname === "/api/caption") {
+          try {
+            if (!authed(req)) return sendJson(res, 401, { error: "비밀번호가 필요합니다." });
+            const key = loadEnvKey();
+            if (!key) return sendJson(res, 400, { error: "ANTHROPIC_API_KEY가 없습니다 (.env)." });
+            process.env.ANTHROPIC_API_KEY = key;
+            const { deck, lang, model, variation } = await readJsonBody(req, 2);
+            if (!deck?.content) return sendJson(res, 400, { error: "덱 내용이 없습니다." });
+            const { generateCaption } = await import("../content/caption.mjs");
+            const result = await generateCaption(deck, {
+              lang: lang === "en" ? "en" : "ko",
+              model: model || "sonnet",
+              variation: Number(variation) || 0,
+            });
+            return sendJson(res, 200, result); // { caption, hashtags }
+          } catch (e) {
+            return sendJson(res, 500, { error: String(e?.message ?? e) });
+          }
+        }
+
         /* ── capture one card ────────────────────────────────────── */
         if (req.method === "POST" && url.pathname === "/api/capture-card") {
           try {

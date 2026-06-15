@@ -567,9 +567,14 @@ function StudioInner() {
   const [phase, setPhase] = useState<"intro" | "studio">("intro");
   const [sel, setSel] = useState(0);
   const [article, setArticle] = useState("");
-  const [busy, setBusy] = useState<null | "ai" | "export" | "bg">(null);
+  const [busy, setBusy] = useState<null | "ai" | "export" | "bg" | "caption">(null);
   const [bgPrompt, setBgPrompt] = useState("");
   const reAtt = useAttachments();
+  // 인스타그램 캡션·해시태그. variation을 올릴 때마다 다른 각도로 새로 쓴다.
+  const [captionLang, setCaptionLang] = useState<"ko" | "en">("ko");
+  const [captionText, setCaptionText] = useState("");
+  const [captionCopied, setCaptionCopied] = useState(false);
+  const captionVar = useRef(0);
   const [prog, setProg] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [shareFiles, setShareFiles] = useState<File[] | null>(null);
@@ -745,6 +750,39 @@ function StudioInner() {
     }
   };
 
+  /* 인스타그램 캡션·해시태그 생성. regen=true면 variation을 올려 새 각도로 다시 쓴다. */
+  const runCaption = async (regen: boolean) => {
+    if (!deck) return;
+    setBusy("caption");
+    setNotice(null);
+    setCaptionCopied(false);
+    captionVar.current = regen ? captionVar.current + 1 : captionVar.current;
+    try {
+      const j = await apiFetch<{ caption: string; hashtags: string[] }>("/api/caption", {
+        deck: { title: deck.meta.title, content: deck.content, cards: deck.cards },
+        lang: captionLang,
+        variation: captionVar.current,
+      });
+      const tags = (j.hashtags || []).map((h) => `#${h.replace(/^#/, "")}`).join(" ");
+      setCaptionText([j.caption?.trim(), tags].filter(Boolean).join("\n\n"));
+    } catch (e) {
+      setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const copyCaption = async () => {
+    if (!captionText) return;
+    try {
+      await navigator.clipboard.writeText(captionText);
+      setCaptionCopied(true);
+      setTimeout(() => setCaptionCopied(false), 1800);
+    } catch {
+      /* clipboard 차단 환경 — 사용자가 직접 선택·복사 */
+    }
+  };
+
   if (!checked) return null;
   if (!unlocked) return <LoginGate onUnlock={() => setUnlocked(true)} />;
 
@@ -889,7 +927,7 @@ function StudioInner() {
                       key={p.id}
                       style={{
                         ...ui.chip,
-                        ...(active ? { background: "#4E86FF", color: "#fff", borderColor: "transparent" } : {}),
+                        ...(active ? { background: "#4E86FF", color: "#fff", border: "1px solid transparent" } : {}),
                       }}
                       onClick={() => patch({ size: { w: p.w, h: p.h } })}
                     >
@@ -954,6 +992,58 @@ function StudioInner() {
                 }}
               />
             </Row>
+          </Panel>
+
+          <Panel title={t("caption")}>
+            <Row label={t("captionLang")}>
+              <div style={{ display: "flex", gap: 6 }}>
+                {([["ko", "한국어"], ["en", "English"]] as const).map(([code, label]) => {
+                  const active = captionLang === code;
+                  return (
+                    <button
+                      key={code}
+                      style={{
+                        ...ui.chip,
+                        ...(active ? { background: "#4E86FF", color: "#fff", border: "1px solid transparent" } : {}),
+                      }}
+                      onClick={() => setCaptionLang(code)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </Row>
+            {!captionText ? (
+              <button
+                style={{ ...ui.primaryPill, width: "100%", opacity: busy ? 0.6 : 1 }}
+                disabled={busy !== null}
+                onClick={() => void runCaption(false)}
+              >
+                {busy === "caption" ? t("captionBusy") : t("captionGen")}
+              </button>
+            ) : (
+              <>
+                <textarea
+                  style={{ ...ui.textarea, minHeight: 150 }}
+                  value={captionText}
+                  onChange={(e) => setCaptionText(e.target.value)}
+                />
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    style={{ ...ui.chip, flex: 1, textAlign: "center", opacity: busy ? 0.6 : 1 }}
+                    disabled={busy !== null}
+                    onClick={() => void runCaption(true)}
+                  >
+                    {busy === "caption" ? t("captionBusy") : t("captionRegen")}
+                  </button>
+                  <button style={{ ...ui.chip, flex: "none" }} onClick={() => void copyCaption()}>
+                    {captionCopied ? t("captionCopied") : t("captionCopy")}
+                  </button>
+                </div>
+              </>
+            )}
+            <div style={{ fontSize: 11, color: "#80868B", lineHeight: 1.6 }}>{t("captionHint")}</div>
           </Panel>
 
           <Panel title={t("composition", { n: specs.length })}>
