@@ -28,7 +28,6 @@ img, svg { display: block; }
 
   /* Topbar: wrap into two rows — logo+button on top, notice below */
   .ek-topbar { flex-wrap: wrap !important; gap: 6px 0 !important; padding: 10px 14px !important; }
-  .ek-topbar-sub { display: none !important; }
   /* Notice spans full width on its own row */
   .ek-topbar-notice {
     width: 100%;

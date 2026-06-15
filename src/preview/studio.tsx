@@ -781,8 +781,7 @@ function StudioInner() {
           <button style={ui.iconPill} onClick={() => setPhase("intro")} title={t("backToStart")}>
             ←
           </button>
-          <span style={{ ...ui.gradientText, fontSize: 16, fontWeight: 600 }}>eigen knot</span>
-          <span className="ek-topbar-sub" style={{ color: "#80868B", fontSize: 12.5 }}>card studio</span>
+          <span style={{ ...ui.gradientText, fontSize: 16, fontWeight: 600 }}>Card News Generator</span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <LangSwitch />
@@ -1092,7 +1091,7 @@ function LoginGate({ onUnlock }: { onUnlock: () => void }) {
     <div style={ui.gate}>
       <LangSwitch style={{ position: "fixed", top: 14, right: 14, zIndex: 20 }} />
       <div style={ui.gateCard}>
-        <div style={{ ...ui.gradientText, fontSize: 24, fontWeight: 600 }}>eigen knot</div>
+        <div style={{ ...ui.gradientText, fontSize: 24, fontWeight: 600 }}>Card News Generator</div>
         <div style={{ color: "#5F6368", fontSize: 13, margin: "8px 0 22px" }}>{t("enterPassword")}</div>
         <input
           type="password"
