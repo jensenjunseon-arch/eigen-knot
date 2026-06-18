@@ -809,7 +809,7 @@ function StudioInner() {
       const mp4 = new File([blob], fname, { type: "video/mp4" });
       const canShare = typeof navigator.canShare === "function" && navigator.canShare({ files: [mp4] });
       if (canShare) setShareFiles([mp4]);
-      setNotice(t("videoDone", { mb: (blob.size / 1_048_576).toFixed(1) }) + (canShare ? t("shareHintSuffix") : ""));
+      setNotice(t("videoDone", { mb: (blob.size / 1_048_576).toFixed(1) }) + (canShare ? t("videoSaveHint") : ""));
     } catch (e) {
       setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
     } finally {

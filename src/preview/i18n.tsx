@@ -104,6 +104,7 @@ const EN = {
   videoBgmFail: "Could not load the music track.",
   videoNoUpload: "Pick an audio file (or choose another track).",
   videoDone: "✓ Video ready — {mb}MB MP4 downloaded.",
+  videoSaveHint: " Tap “Save to Photos” above to keep it.",
   videoNote: "{n} cards ≈ {sec}s total, {w}×{h} MP4. Each card's time adapts to its text length; hard cuts (no animation). Encoded in your browser; first run loads the encoder once.",
   // gallery
   galleryClose: "✕ Back to grid",
@@ -267,6 +268,7 @@ const KO: Dict = {
   videoBgmFail: "음악 트랙을 불러오지 못했습니다.",
   videoNoUpload: "오디오 파일을 선택하세요 (또는 다른 트랙을 고르세요).",
   videoDone: "✓ 영상 완성 — {mb}MB MP4 다운로드됨.",
+  videoSaveHint: " 위 ‘사진첩에 저장’ 버튼으로 저장하세요.",
   videoNote: "카드 {n}장 ≈ 총 {sec}초, {w}×{h} MP4. 각 카드 시간은 글 길이에 맞춰 자동 조절, 하드컷(애니메이션 없음). 브라우저에서 인코딩하며 처음 한 번 인코더를 불러옵니다.",
   galleryClose: "✕ 그리드로",
   galleryHint: "←/→ 이동 · Esc 닫기 · 카드를 더블클릭하면 확대",
