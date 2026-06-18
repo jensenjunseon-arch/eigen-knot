@@ -112,7 +112,7 @@ const EN = {
     closing: "Closing",
   } as Record<CardRole, string>,
   fields: {
-    kicker: "Kicker (Latin)",
+    kicker: "Kicker (Latin or Korean)",
     headline: "Headline",
     lines: "3 summary lines",
     term_ko: "Term",
@@ -252,7 +252,7 @@ const KO: Dict = {
     closing: "끝맺음",
   },
   fields: {
-    kicker: "킥커 (영문)",
+    kicker: "킥커 (영문·한글)",
     headline: "헤드라인",
     lines: "요약 3줄",
     term_ko: "개념",

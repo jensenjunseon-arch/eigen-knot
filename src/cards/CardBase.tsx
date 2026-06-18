@@ -146,19 +146,22 @@ export function CardBody({
   );
 }
 
-// English kicker — Cormorant italic in the deck accent (a designated slot).
+// Kicker in the deck accent (a designated slot). Latin → Cormorant italic;
+// Korean → the deck's own font upright (Cormorant has no Hangul, and faux-
+// italicised Korean reads badly), so a 한글 킥커 still looks intentional.
 export function Kicker({ children }: { children: ReactNode }) {
   const t = useTheme();
+  const korean = typeof children === "string" && /[가-힣㄰-㆏]/.test(children);
   return (
     <div
       className="ek-nowrap"
       style={{
-        fontFamily: FONT.display,
-        fontStyle: "italic",
+        fontFamily: korean ? t.fontFamily : FONT.display,
+        fontStyle: korean ? "normal" : "italic",
         fontWeight: 600,
-        fontSize: t.ts(30),
+        fontSize: korean ? t.ts(26) : t.ts(30),
         color: t.accent,
-        letterSpacing: "0.01em",
+        letterSpacing: korean ? "0.02em" : "0.01em",
         marginBottom: t.ts(28),
       }}
     >
