@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import JSZip from "jszip";
-import type { CardRole, Deck, DeckContent } from "@/types";
+import type { CardRole, CardSpec, Deck, DeckContent } from "@/types";
 import { CARD_ORDER, ALL_ROLES, PLATFORMS, activeSpecs, deckSize, defaultClosing } from "@/types";
 import { RenderCard } from "@/cards/cards";
 import { resolvedZipName, resolvedCardFilename } from "@/lib/filename";
@@ -34,10 +34,38 @@ const ACCENT_PRESETS = [
 // Built-in free BGM for the video export. Each id maps to a CC0 file under
 // public/audio/ (provenance in public/audio/CREDITS.md). Labels live in i18n.
 const BGM_TRACKS = [
-  { id: "calm", file: "/audio/calm.mp3" },
-  { id: "ambient", file: "/audio/ambient.mp3" },
+  { id: "lofi", file: "/audio/lofi.mp3" },
+  { id: "editorial", file: "/audio/editorial.mp3" },
 ] as const;
 type MusicId = "none" | "upload" | (typeof BGM_TRACKS)[number]["id"];
+
+// 카드의 보이는 텍스트 글자 수(마크업·줄바꿈 제외) — 슬라이드 체류 시간의 근거.
+function cardTextLen(c: DeckContent, role: CardRole): number {
+  const s = (...xs: (string | undefined)[]) =>
+    xs.filter(Boolean).join(" ").replace(/<\/?b>/g, "").replace(/\s+/g, " ").trim().length;
+  switch (role) {
+    case "cover": return s(c.cover.kicker, c.cover.headline);
+    case "summary": return s(...(c.summary.lines || []));
+    case "definition": return s(c.definition.term_ko, c.definition.body);
+    case "compare": return s(c.compare.left?.headline, c.compare.left?.detail, c.compare.right?.headline, c.compare.right?.detail, c.compare.common?.punch, c.compare.common?.sub);
+    case "diagnosis": return s(c.diagnosis.headline, ...(c.diagnosis.paras || []));
+    case "analysis": return s(c.analysis.headline, ...(c.analysis.items || []));
+    case "grid": return s(...(c.grid.rows || []).flat());
+    case "claim": return s(c.claim.headline, c.claim.emphasis, c.claim.sub);
+    case "conclusion": return s(c.conclusion.intro, ...(c.conclusion.couplet || []));
+    case "closing": return s(c.closing?.tagline, c.closing?.subline, c.closing?.note);
+    default: return 30;
+  }
+}
+
+// 슬라이드별 길이(초): 기본 dwell + 글자당 가산 → 글 많은 카드가 더 오래 머문다.
+// pace(전체 속도 배수, 1=기본)를 곱한다. 카드당 2.4–6.5초(pace 1 기준).
+function slideDurations(content: DeckContent, specs: CardSpec[], pace: number): number[] {
+  return specs.map((sp) => {
+    const sec = 2.0 + cardTextLen(content, sp.role) / 22;
+    return +(Math.min(6.5, Math.max(2.4, sec)) * pace).toFixed(2);
+  });
+}
 
 type Path = (string | number)[];
 
@@ -580,8 +608,8 @@ function StudioInner() {
   const [bgPrompt, setBgPrompt] = useState("");
   const reAtt = useAttachments();
   // 영상(릴스/쇼츠) 내보내기 옵션.
-  const [vidMusic, setVidMusic] = useState<MusicId>("calm");
-  const [vidSec, setVidSec] = useState(2.7);
+  const [vidMusic, setVidMusic] = useState<MusicId>("lofi");
+  const [vidPace, setVidPace] = useState(1);
   const [vidUpload, setVidUpload] = useState<File | null>(null);
   const [vidConsent, setVidConsent] = useState(false);
   // 인스타그램 캡션·해시태그. variation을 올릴 때마다 다른 각도로 새로 쓴다.
@@ -765,9 +793,10 @@ function StudioInner() {
       }
 
       const { w, h } = deckSize(deck);
+      const durations = slideDurations(deck.content, activeSpecs(deck), vidPace);
       const blob = await encodeSlideshow({
         pngB64s,
-        perCardSeconds: vidSec,
+        durations,
         w,
         h,
         audio,
@@ -886,7 +915,7 @@ function StudioInner() {
   const accent = deck.accent ?? "#D44B6A";
   // 업로드 음원을 고른 경우, 파일 + 권리 동의가 있어야 영상 생성을 허용한다.
   const videoBlocked = vidMusic === "upload" && (!vidUpload || !vidConsent);
-  const vidTotal = specs.length * vidSec;
+  const vidTotal = slideDurations(deck.content, activeSpecs(deck), vidPace).reduce((a, b) => a + b, 0);
 
   return (
     <div style={ui.root}>
@@ -1062,15 +1091,15 @@ function StudioInner() {
                 </label>
               </div>
             )}
-            <Row label={t("perCardSeconds", { s: vidSec.toFixed(1) })}>
+            <Row label={t("videoPace", { x: vidPace.toFixed(2) })}>
               <input
                 type="range"
-                min={1.5}
-                max={5}
-                step={0.1}
-                value={vidSec}
+                min={0.7}
+                max={1.4}
+                step={0.05}
+                value={vidPace}
                 style={ui.range}
-                onChange={(e) => setVidSec(Number(e.target.value))}
+                onChange={(e) => setVidPace(Number(e.target.value))}
               />
             </Row>
             <button

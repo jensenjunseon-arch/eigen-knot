@@ -9,8 +9,8 @@ voices. When swapping/adding a track, confirm CC0 at the source and update this 
 
 | File | Mood | Source | License | Added |
 |------|------|--------|---------|-------|
-| `calm.mp3` | Calm | OpenGameArt — "Calm Loop" by josepharaoh99 — https://opengameart.org/content/calm-loop | CC0 1.0 | 2026-06-18 |
-| `ambient.mp3` | Ambient | OpenGameArt — "Scifi City - Ambient Loop" — https://opengameart.org/content/scifi-city-ambient-loop | CC0 1.0 | 2026-06-18 |
+| `lofi.mp3` | Lo-fi | OpenGameArt — "lofi Compilation" ("A cup of tea") — https://opengameart.org/content/lofi-compilation | CC0 1.0 | 2026-06-18 |
+| `editorial.mp3` | Editorial | OpenGameArt — "lofi Compilation" ("Oceanside") — https://opengameart.org/content/lofi-compilation | CC0 1.0 | 2026-06-18 |
 
 ## Notes
 - Users can also upload their own audio in the studio (processed locally in the

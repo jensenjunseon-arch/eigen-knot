@@ -23,8 +23,9 @@ export interface AudioInput {
 export interface EncodeOptions {
   /** Base64 PNGs (no dataURL prefix), one per card, in order. */
   pngB64s: string[];
-  /** Seconds each card is held on screen (hard cut, no animation). */
-  perCardSeconds: number;
+  /** Seconds each card is held (hard cut). One entry per image — text-heavy
+   *  cards get a longer dwell. Length must match pngB64s. */
+  durations: number[];
   /** Canvas size — from deckSize(deck); ffmpeg does no scaling. */
   w: number;
   h: number;
@@ -72,15 +73,15 @@ export function disposeFfmpeg(): void {
 const b64ToBytes = (b64: string): Uint8Array => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 const pad3 = (n: number): string => String(n).padStart(3, "0");
 
-// concat-demuxer list. Each `file` precedes its `duration`; the LAST image is
+// concat-demuxer list. Each `file` precedes its own `duration`; the LAST image is
 // repeated once WITHOUT a duration so the final card holds its full time (the
 // demuxer uses each duration only to advance to the NEXT entry).
-function concatList(count: number, sec: number): string {
+function concatList(durations: number[]): string {
   const lines: string[] = [];
-  for (let i = 0; i < count; i++) {
-    lines.push(`file img${pad3(i)}.png`, `duration ${sec}`);
+  for (let i = 0; i < durations.length; i++) {
+    lines.push(`file img${pad3(i)}.png`, `duration ${durations[i].toFixed(3)}`);
   }
-  lines.push(`file img${pad3(count - 1)}.png`);
+  lines.push(`file img${pad3(durations.length - 1)}.png`);
   return lines.join("\n") + "\n";
 }
 
@@ -88,13 +89,14 @@ function concatList(count: number, sec: number): string {
 // duplicates frames rather than interpolating. -pix_fmt yuv420p is MANDATORY or
 // the file plays black on iOS/QuickTime. -t bounds the looped BGM deterministically.
 export async function encodeSlideshow(opts: EncodeOptions): Promise<Blob> {
-  const { pngB64s, perCardSeconds, audio, onProgress, onPhase } = opts;
+  const { pngB64s, durations, audio, onProgress, onPhase } = opts;
   if (!pngB64s.length) throw new Error("No images to encode.");
+  if (durations.length !== pngB64s.length) throw new Error("durations must match the number of images.");
 
   onPhase?.("loading");
   const ff = await loadFfmpeg();
 
-  const total = +(pngB64s.length * perCardSeconds).toFixed(3);
+  const total = +durations.reduce((a, b) => a + b, 0).toFixed(3);
   const written: string[] = [];
   const onProg = ({ progress }: { progress: number }) => onProgress?.(Math.max(0, Math.min(1, progress)));
   ff.on("progress", onProg);
@@ -105,7 +107,7 @@ export async function encodeSlideshow(opts: EncodeOptions): Promise<Blob> {
       await ff.writeFile(name, b64ToBytes(pngB64s[i]));
       written.push(name);
     }
-    await ff.writeFile("list.txt", new TextEncoder().encode(concatList(pngB64s.length, perCardSeconds)));
+    await ff.writeFile("list.txt", new TextEncoder().encode(concatList(durations)));
     written.push("list.txt");
 
     const args = ["-f", "concat", "-safe", "0", "-i", "list.txt"];
@@ -113,19 +115,21 @@ export async function encodeSlideshow(opts: EncodeOptions): Promise<Blob> {
       const aname = `bgm.${audio.ext || "mp3"}`;
       await ff.writeFile(aname, audio.data);
       written.push(aname);
-      // fade the music out over the last 2s (or the whole clip if shorter)
-      const fadeDur = Math.min(2, total);
+      // Fade the music out so the end never cuts abruptly: a generous tail
+      // (≈25% of the clip, clamped 3–5s) that reaches full silence right at the
+      // end. afadeout `st` is the start of the fade; it hits 0 at st+d = total.
+      const fadeDur = Math.max(3, Math.min(5, +(total * 0.25).toFixed(3)));
       const fadeStart = Math.max(0, +(total - fadeDur).toFixed(3));
       args.push(
         "-stream_loop", "-1", "-i", aname,
         "-map", "0:v", "-map", "1:a",
-        "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
+        "-c:a", "aac", "-b:a", "256k", "-ar", "48000",
         "-af", `afade=t=out:st=${fadeStart}:d=${fadeDur}`,
       );
     }
     args.push(
       "-vsync", "cfr", "-r", "30",
-      "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+      "-c:v", "libx264", "-preset", "medium", "-crf", "18",
       "-pix_fmt", "yuv420p", "-profile:v", "high", "-level:v", "4.0",
       "-t", String(total), "-movflags", "+faststart", "out.mp4",
     );
