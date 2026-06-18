@@ -12,5 +12,8 @@ export default defineConfig({
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
+  // @ffmpeg/ffmpeg spawns its own classWorker; pre-bundling it breaks the
+  // `new Worker(new URL(...))` resolution, so exclude it from optimizeDeps.
+  optimizeDeps: { exclude: ["@ffmpeg/ffmpeg", "@ffmpeg/util"] },
   build: { outDir: "dist", assetsInlineLimit: 0 },
 });

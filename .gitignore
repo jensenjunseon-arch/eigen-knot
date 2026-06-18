@@ -6,3 +6,6 @@ output
 *.log
 .DS_Store
 drafts
+# ffmpeg.wasm core (~31MB) — generated from @ffmpeg/core by `npm run copy-ffmpeg-core`
+# (predev/prebuild), so it self-hosts at deploy time without bloating git.
+public/ffmpeg/

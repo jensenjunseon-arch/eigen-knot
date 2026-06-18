@@ -8,6 +8,7 @@ import { FONT_CHOICES, DEFAULT_FONT_ID, defaultFontFor } from "@/design/fonts";
 import { SAMPLE_DECK } from "@/sample";
 import { cardOverflow } from "./shared";
 import { apiFetch, checkPassword, getPw, savePw, imageToBg, b64ToBg, downloadBlob, fileToMedia, type MediaAttachment } from "./api";
+import { encodeSlideshow, type AudioInput } from "./video";
 import { abstractBg, randomSeed } from "@/lib/abstractBg";
 import { I18nProvider, LangSwitch, useI18n } from "./i18n";
 
@@ -29,6 +30,14 @@ const ACCENT_PRESETS = [
   { id: "tickled", value: "#F0A8BC" },       // Tickled Pink — blush
   { id: "caramel", value: "#C98A50" },       // Caramel — warm sand
 ];
+
+// Built-in free BGM for the video export. Each id maps to a CC0 file under
+// public/audio/ (provenance in public/audio/CREDITS.md). Labels live in i18n.
+const BGM_TRACKS = [
+  { id: "calm", file: "/audio/calm.mp3" },
+  { id: "ambient", file: "/audio/ambient.mp3" },
+] as const;
+type MusicId = "none" | "upload" | (typeof BGM_TRACKS)[number]["id"];
 
 type Path = (string | number)[];
 
@@ -567,9 +576,14 @@ function StudioInner() {
   const [phase, setPhase] = useState<"intro" | "studio">("intro");
   const [sel, setSel] = useState(0);
   const [article, setArticle] = useState("");
-  const [busy, setBusy] = useState<null | "ai" | "export" | "bg" | "caption">(null);
+  const [busy, setBusy] = useState<null | "ai" | "export" | "bg" | "caption" | "video">(null);
   const [bgPrompt, setBgPrompt] = useState("");
   const reAtt = useAttachments();
+  // 영상(릴스/쇼츠) 내보내기 옵션.
+  const [vidMusic, setVidMusic] = useState<MusicId>("calm");
+  const [vidSec, setVidSec] = useState(2.7);
+  const [vidUpload, setVidUpload] = useState<File | null>(null);
+  const [vidConsent, setVidConsent] = useState(false);
   // 인스타그램 캡션·해시태그. variation을 올릴 때마다 다른 각도로 새로 쓴다.
   const [captionLang, setCaptionLang] = useState<"ko" | "en">("ko");
   const [captionText, setCaptionText] = useState("");
@@ -716,6 +730,65 @@ function StudioInner() {
     }
   };
 
+  /* 영상(릴스/쇼츠) 내보내기 — 카드 PNG들을 그대로 이어붙여 9:16 MP4로 인코딩.
+     캡처는 PNG 내보내기와 동일한 경로(카드당 1회 재시도). 인코딩은 브라우저
+     안에서 ffmpeg.wasm(싱글스레드)으로 처리하므로 서버/헤더 변경이 없다. */
+  const runVideo = async () => {
+    if (!deck) return;
+    setBusy("video");
+    setNotice(null);
+    setShareFiles(null);
+    try {
+      const n = specs.length;
+      const pngB64s: string[] = [];
+      for (let i = 0; i < n; i++) {
+        setProg(`${t("capturing")} ${i + 1}/${n}`);
+        let card: { name: string; b64: string };
+        try {
+          card = await apiFetch("/api/capture-card", { deck, index: i });
+        } catch {
+          setProg(t("retrying", { p: `${i + 1}/${n}` }));
+          card = await apiFetch("/api/capture-card", { deck, index: i });
+        }
+        pngB64s.push(card.b64);
+      }
+
+      let audio: AudioInput | null = null;
+      if (vidMusic === "upload") {
+        if (!vidUpload) throw new Error(t("videoNoUpload"));
+        audio = { data: new Uint8Array(await vidUpload.arrayBuffer()), ext: (vidUpload.name.split(".").pop() || "mp3").toLowerCase() };
+      } else if (vidMusic !== "none") {
+        const track = BGM_TRACKS.find((tk) => tk.id === vidMusic);
+        const res = track && (await fetch(track.file));
+        if (!res || !res.ok) throw new Error(t("videoBgmFail"));
+        audio = { data: new Uint8Array(await res.arrayBuffer()), ext: "mp3" };
+      }
+
+      const { w, h } = deckSize(deck);
+      const blob = await encodeSlideshow({
+        pngB64s,
+        perCardSeconds: vidSec,
+        w,
+        h,
+        audio,
+        onPhase: (p) => setProg(p === "loading" ? t("videoLoadingCore") : t("encodingVideo")),
+        onProgress: (r) => setProg(`${t("encodingVideo")} ${Math.round(r * 100)}%`),
+      });
+
+      const fname = resolvedZipName(deck).replace(/\.zip$/i, ".mp4");
+      downloadBlob(blob, fname);
+      const mp4 = new File([blob], fname, { type: "video/mp4" });
+      const canShare = typeof navigator.canShare === "function" && navigator.canShare({ files: [mp4] });
+      if (canShare) setShareFiles([mp4]);
+      setNotice(t("videoDone", { mb: (blob.size / 1_048_576).toFixed(1) }) + (canShare ? t("shareHintSuffix") : ""));
+    } catch (e) {
+      setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(null);
+      setProg("");
+    }
+  };
+
   /* 사진첩 저장 — 공유 시트는 사용자 탭에서만 열 수 있어 별도 버튼으로 제공 */
   const runShare = async () => {
     if (!shareFiles) return;
@@ -811,6 +884,9 @@ function StudioInner() {
   const bodyDim = deck.dims?.summary ?? 0.9;
   const selDim = deck.dims?.[spec.role] ?? spec.dim;
   const accent = deck.accent ?? "#D44B6A";
+  // 업로드 음원을 고른 경우, 파일 + 권리 동의가 있어야 영상 생성을 허용한다.
+  const videoBlocked = vidMusic === "upload" && (!vidUpload || !vidConsent);
+  const vidTotal = specs.length * vidSec;
 
   return (
     <div style={ui.root}>
@@ -828,6 +904,16 @@ function StudioInner() {
               {t("saveToPhotos")}
             </button>
           )}
+          <button
+            className="ek-export-btn"
+            style={{ ...ui.chip, fontWeight: 600, opacity: busy || videoBlocked ? 0.6 : 1 }}
+            disabled={busy !== null || videoBlocked}
+            onClick={runVideo}
+            title={t("makeReelsHint")}
+          >
+            <span className="ek-export-full">{busy === "video" ? (prog || "…") : t("makeReels")}</span>
+            <span className="ek-export-short">{busy === "video" ? (prog || "…") : "🎬"}</span>
+          </button>
           <button className="ek-export-btn" style={{ ...ui.primaryPill, opacity: busy ? 0.6 : 1 }} disabled={busy !== null} onClick={runExport}>
             <span className="ek-export-full">{busy === "export" ? t("exporting", { p: prog }) : t("exportPngs", { n: specs.length })}</span>
             <span className="ek-export-short">{busy === "export" ? (prog || "…") : t("exportShort")}</span>
@@ -940,6 +1026,63 @@ function StudioInner() {
                 {t("sizeNote", { w, h })}
               </div>
             </Row>
+          </Panel>
+
+          <Panel title={t("videoExport")}>
+            <Row label={t("videoMusic")}>
+              <select style={ui.input} value={vidMusic} onChange={(e) => setVidMusic(e.target.value as MusicId)}>
+                <option value="none">{t("musicNone")}</option>
+                {BGM_TRACKS.map((tk) => (
+                  <option key={tk.id} value={tk.id}>{t(`music_${tk.id}` as Parameters<typeof t>[0])}</option>
+                ))}
+                <option value="upload">{t("musicUpload")}</option>
+              </select>
+            </Row>
+            {vidMusic === "upload" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <label style={{ ...ui.chip, textAlign: "center", cursor: "pointer" }}>
+                  {vidUpload ? `🎵 ${vidUpload.name}` : t("musicPick")}
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    hidden
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      if (f && f.size > 25 * 1_048_576) {
+                        setNotice(`✗ ${t("musicTooBig")}`);
+                        return;
+                      }
+                      setVidUpload(f);
+                    }}
+                  />
+                </label>
+                <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 11, color: "#5F6368", lineHeight: 1.5, cursor: "pointer" }}>
+                  <input type="checkbox" checked={vidConsent} onChange={(e) => setVidConsent(e.target.checked)} style={{ marginTop: 2 }} />
+                  <span>{t("uploadAudioDisclaimer")}</span>
+                </label>
+              </div>
+            )}
+            <Row label={t("perCardSeconds", { s: vidSec.toFixed(1) })}>
+              <input
+                type="range"
+                min={1.5}
+                max={5}
+                step={0.1}
+                value={vidSec}
+                style={ui.range}
+                onChange={(e) => setVidSec(Number(e.target.value))}
+              />
+            </Row>
+            <button
+              style={{ ...ui.primaryPill, width: "100%", opacity: busy || videoBlocked ? 0.6 : 1 }}
+              disabled={busy !== null || videoBlocked}
+              onClick={runVideo}
+            >
+              {busy === "video" ? (prog || t("encodingVideo")) : t("makeReels")}
+            </button>
+            <div style={{ fontSize: 11, color: "#80868B", lineHeight: 1.6 }}>
+              {t("videoNote", { w, h, n: specs.length, sec: vidTotal.toFixed(0) })}
+            </div>
           </Panel>
 
           <Panel title={t("bgPhoto")}>
