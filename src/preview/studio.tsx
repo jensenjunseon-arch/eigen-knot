@@ -7,7 +7,7 @@ import { resolvedZipName, resolvedCardFilename } from "@/lib/filename";
 import { FONT_CHOICES, DEFAULT_FONT_ID, defaultFontFor } from "@/design/fonts";
 import { SAMPLE_DECK } from "@/sample";
 import { cardOverflow } from "./shared";
-import { apiFetch, checkPassword, getPw, savePw, imageToBg, b64ToBg, downloadBlob, fileToMedia, type MediaAttachment } from "./api";
+import { apiFetch, checkPassword, getPw, savePw, imageToBg, b64ToBg, deliverFiles, fileToMedia, type MediaAttachment } from "./api";
 import { encodeSlideshow, type AudioInput } from "./video";
 import { listDecks, getDeck, saveDeck, deleteDeck, duplicateDeck, renameDeck, migrateOldSlot, newDeckId, type SavedDeck } from "./library";
 import { abstractBg, randomSeed } from "@/lib/abstractBg";
@@ -708,7 +708,6 @@ function StudioInner() {
   const captionVar = useRef(0);
   const [prog, setProg] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
-  const [shareFiles, setShareFiles] = useState<File[] | null>(null);
   const [gallery, setGallery] = useState(false);
   const isMobile = useIsMobile();
   const [unlocked, setUnlocked] = useState(false);
@@ -845,7 +844,6 @@ function StudioInner() {
     if (!deck) return;
     setBusy("export");
     setNotice(null);
-    setShareFiles(null);
     try {
       const n = specs.length;
       const zip = new JSZip();
@@ -869,15 +867,10 @@ function StudioInner() {
       }
       setProg("zip…");
       const blob = await zip.generateAsync({ type: "blob" });
-      downloadBlob(blob, resolvedZipName(deck));
-      const canShare =
-        typeof navigator.canShare === "function" && navigator.canShare({ files });
-      if (canShare) setShareFiles(files);
-      setNotice(
-        anyOverflow
-          ? t("someOverflow")
-          : t("downloadDone", { n }) + (canShare ? t("shareHintSuffix") : ""),
-      );
+      // 모바일=공유 시트(사진첩) / 데스크톱·폴백=다운로드. 개별 PNG는 공유로,
+      // 폴백 다운로드는 ZIP으로 받는다.
+      const how = await deliverFiles(files, blob, resolvedZipName(deck));
+      setNotice(anyOverflow ? t("someOverflow") : how === "shared" ? t("savedShare") : t("downloadDone", { n }));
     } catch (e) {
       setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -893,7 +886,6 @@ function StudioInner() {
     if (!deck) return;
     setBusy("video");
     setNotice(null);
-    setShareFiles(null);
     try {
       const n = specs.length;
       const pngB64s: string[] = [];
@@ -933,27 +925,14 @@ function StudioInner() {
       });
 
       const fname = resolvedZipName(deck).replace(/\.zip$/i, ".mp4");
-      downloadBlob(blob, fname);
       const mp4 = new File([blob], fname, { type: "video/mp4" });
-      const canShare = typeof navigator.canShare === "function" && navigator.canShare({ files: [mp4] });
-      if (canShare) setShareFiles([mp4]);
-      setNotice(t("videoDone", { mb: (blob.size / 1_048_576).toFixed(1) }) + (canShare ? t("videoSaveHint") : ""));
+      const how = await deliverFiles([mp4], blob, fname);
+      setNotice(how === "shared" ? t("savedShare") : t("videoDone", { mb: (blob.size / 1_048_576).toFixed(1) }));
     } catch (e) {
       setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(null);
       setProg("");
-    }
-  };
-
-  /* 사진첩 저장 — 공유 시트는 사용자 탭에서만 열 수 있어 별도 버튼으로 제공 */
-  const runShare = async () => {
-    if (!shareFiles) return;
-    try {
-      await navigator.share({ files: shareFiles });
-    } catch (e) {
-      // 사용자가 시트를 닫은 경우(AbortError)는 조용히 무시.
-      if (e instanceof Error && e.name !== "AbortError") setNotice(t("shareFailed", { msg: e.message }));
     }
   };
 
@@ -1071,20 +1050,15 @@ function StudioInner() {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <LangSwitch />
-          {shareFiles && busy === null && (
-            <button style={ui.chip} onClick={() => void runShare()}>
-              {t("saveToPhotos")}
-            </button>
-          )}
           <button
             className="ek-export-btn"
-            style={{ ...ui.chip, fontWeight: 600, opacity: busy || videoBlocked ? 0.6 : 1 }}
+            style={{ ...ui.exportSecondary, opacity: busy || videoBlocked ? 0.6 : 1 }}
             disabled={busy !== null || videoBlocked}
             onClick={runVideo}
             title={t("makeReelsHint")}
           >
             <span className="ek-export-full">{busy === "video" ? (prog || "…") : t("makeReels")}</span>
-            <span className="ek-export-short">{busy === "video" ? (prog || "…") : "🎬"}</span>
+            <span className="ek-export-short">{busy === "video" ? (prog || "…") : t("videoShort")}</span>
           </button>
           <button className="ek-export-btn" style={{ ...ui.primaryPill, opacity: busy ? 0.6 : 1 }} disabled={busy !== null} onClick={runExport}>
             <span className="ek-export-full">{busy === "export" ? t("exporting", { p: prog }) : t("exportPngs", { n: specs.length })}</span>
@@ -1648,6 +1622,17 @@ const ui: Record<string, CSSProperties> = {
     background: GRADIENT,
     color: "#fff",
     border: "none",
+    borderRadius: 999,
+    padding: "9px 18px",
+    fontSize: 13.5,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  // 영상 내보내기 버튼 — PNG 내보내기와 같은 크기의 펠(보조 색).
+  exportSecondary: {
+    background: "#EDF2FA",
+    color: "#2D3142",
+    border: "1px solid rgba(0,0,0,0.12)",
     borderRadius: 999,
     padding: "9px 18px",
     fontSize: 13.5,

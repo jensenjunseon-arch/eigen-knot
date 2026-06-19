@@ -118,3 +118,35 @@ export function downloadBlob(blob: Blob, filename: string): void {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+// Deliver the export by the device's most natural mechanism:
+//  • desktop          → download to the Downloads folder
+//  • mobile (iOS/And) → the native share sheet → "Save Image/Video" lands it in
+//                       Photos/Gallery; the user picks the destination
+//  • fallback         → download (Android auto-adds the media to the gallery;
+//                       iOS lands it in Files)
+//
+// Reality check (intentional): both exports run a ~10–20s capture/encode BEFORE
+// the file exists, and navigator.share() is transient-activation-gated (~5s on
+// Android, an undisclosed few seconds on iOS — WebKit calls this unsolved). So
+// after a slow export the share sheet often can't open and we degrade to a
+// download. Returns what actually happened so the caller can phrase the notice.
+export async function deliverFiles(files: File[], blob: Blob, filename: string): Promise<"shared" | "downloaded"> {
+  const ua = navigator.userAgent || "";
+  const isIOS = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(ua);
+  const isMobile = isIOS || isAndroid;
+
+  if (isMobile && typeof navigator.canShare === "function" && navigator.canShare({ files })) {
+    try {
+      await navigator.share({ files });
+      return "shared";
+    } catch (e) {
+      // User dismissed the sheet → it WAS shown; treat as done, don't double-deliver.
+      if (e instanceof Error && e.name === "AbortError") return "shared";
+      // NotAllowedError (activation expired), unsupported, etc. → fall through to download.
+    }
+  }
+  downloadBlob(blob, filename);
+  return "downloaded";
+}
