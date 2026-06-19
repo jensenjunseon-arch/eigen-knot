@@ -617,9 +617,9 @@ function Library({
   const tile: CSSProperties = { background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 12px rgba(66,133,244,0.08)" };
   const iconBtn: CSSProperties = { background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: "#5F6368", padding: 4, lineHeight: 1 };
   return (
-    <div style={{ ...ui.introRoot, alignItems: "flex-start", paddingTop: 56 }}>
+    <div style={{ ...ui.introRoot, alignItems: "flex-start", padding: "56px 0 24px" }}>
       <LangSwitch style={{ position: "fixed", top: 14, right: 14, zIndex: 20 }} />
-      <div style={{ width: "100%", maxWidth: 940, margin: "0 auto", padding: "0 16px" }}>
+      <div style={{ width: "100%", maxWidth: 940, margin: "0 auto", padding: "0 16px", boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <div className="ek-intro-title" style={{ ...ui.gradientTitle, textAlign: "left", fontSize: 26 }}>{t("libraryTitle")}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -629,7 +629,7 @@ function Library({
         </div>
         <div style={{ color: note ? "#1E8E3E" : "#5F6368", fontSize: 13, margin: "8px 0 20px", lineHeight: 1.6 }}>{note ?? t("librarySub")}</div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(176px, 1fr))", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 14 }}>
           <button
             onClick={onNew}
             style={{ ...tile, aspectRatio: "4 / 5", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", color: "#4E86FF", fontSize: 14, fontWeight: 600, border: "1.5px dashed rgba(78,134,255,0.45)", boxShadow: "none", background: "rgba(255,255,255,0.6)" }}
