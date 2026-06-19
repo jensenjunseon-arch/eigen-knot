@@ -9,16 +9,16 @@ import { SAMPLE_DECK } from "@/sample";
 import { cardOverflow } from "./shared";
 import { apiFetch, checkPassword, getPw, savePw, imageToBg, b64ToBg, downloadBlob, fileToMedia, type MediaAttachment } from "./api";
 import { encodeSlideshow, type AudioInput } from "./video";
+import { listDecks, getDeck, saveDeck, deleteDeck, duplicateDeck, renameDeck, migrateOldSlot, newDeckId, type SavedDeck } from "./library";
 import { abstractBg, randomSeed } from "@/lib/abstractBg";
 import { I18nProvider, LangSwitch, useI18n } from "./i18n";
 
 /* ════════════════════════════════════════════════════════════════════════
    eigen knot — card studio
-   인트로(글 입력 → AI가 제목·구성·장수까지 결정) → 스튜디오(상세 조정).
-   덱은 브라우저(localStorage)에 자동 저장된다.
+   보관함(저장된 카드뉴스) → 인트로(글 입력 → AI 구성) → 스튜디오(상세 조정).
+   덱들은 브라우저(IndexedDB)의 보관함에 자동 저장된다 (library.ts).
    ════════════════════════════════════════════════════════════════════════ */
 
-const STORE_KEY = "ek-studio-v1";
 const BODY_ROLES: CardRole[] = ["summary", "definition", "compare", "diagnosis", "analysis", "grid", "claim", "conclusion"];
 
 // 2025 trend accent palette. Labels live in i18n.
@@ -493,15 +493,15 @@ function AttachControl({ att }: { att: Attach }) {
 }
 
 function Intro({
-  hasSaved,
-  onContinue,
+  canGoBack,
+  onBack,
   onAI,
   onSample,
   busy,
   notice,
 }: {
-  hasSaved: boolean;
-  onContinue: () => void;
+  canGoBack: boolean;
+  onBack: () => void;
   onAI: (article: string, media: MediaAttachment[]) => void;
   onSample: () => void;
   busy: boolean;
@@ -564,15 +564,112 @@ function Intro({
         )}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 26, flexWrap: "wrap" }}>
-          {hasSaved && (
-            <button style={ui.chipLg} onClick={onContinue}>
-              {t("continueEditing")}
+          {canGoBack && (
+            <button style={ui.chipLg} onClick={onBack}>
+              {t("backToLibrary")}
             </button>
           )}
           <button style={ui.chipLg} onClick={onSample}>
             {t("exploreSample")}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── 보관함(내 카드뉴스) ───────────────────────────────────────────────── */
+function coverThumbTitle(deck: Deck): string {
+  return (deck.content?.cover?.headline || deck.meta?.title || "")
+    .replace(/<\/?b>/g, "")
+    .replace(/\n/g, " ")
+    .trim();
+}
+function relTime(ts: number, t: (k: "relNow" | "relMin" | "relHour" | "relDay", v?: Record<string, string | number>) => string): string {
+  const diff = Date.now() - ts;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return t("relNow");
+  if (m < 60) return t("relMin", { n: m });
+  const h = Math.floor(m / 60);
+  if (h < 24) return t("relHour", { n: h });
+  const dys = Math.floor(h / 24);
+  if (dys < 7) return t("relDay", { n: dys });
+  return new Date(ts).toLocaleDateString();
+}
+
+function Library({
+  decks,
+  onOpen,
+  onNew,
+  onDelete,
+  onDuplicate,
+  onRename,
+}: {
+  decks: SavedDeck[];
+  onOpen: (id: string) => void;
+  onNew: () => void;
+  onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
+  onRename: (id: string, name: string) => void;
+}) {
+  const { t } = useI18n();
+  const [note, setNote] = useState<string | null>(null);
+  const tile: CSSProperties = { background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 12px rgba(66,133,244,0.08)" };
+  const iconBtn: CSSProperties = { background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: "#5F6368", padding: 4, lineHeight: 1 };
+  return (
+    <div style={{ ...ui.introRoot, alignItems: "flex-start", paddingTop: 56 }}>
+      <LangSwitch style={{ position: "fixed", top: 14, right: 14, zIndex: 20 }} />
+      <div style={{ width: "100%", maxWidth: 940, margin: "0 auto", padding: "0 16px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+          <div className="ek-intro-title" style={{ ...ui.gradientTitle, textAlign: "left", fontSize: 26 }}>{t("libraryTitle")}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ ...ui.chip, cursor: "default" }}>{t("guestMode")}</span>
+            <button style={ui.chip} onClick={() => setNote(t("loginSoon"))}>{t("loginBtn")}</button>
+          </div>
+        </div>
+        <div style={{ color: note ? "#1E8E3E" : "#5F6368", fontSize: 13, margin: "8px 0 20px", lineHeight: 1.6 }}>{note ?? t("librarySub")}</div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(176px, 1fr))", gap: 14 }}>
+          <button
+            onClick={onNew}
+            style={{ ...tile, aspectRatio: "4 / 5", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", color: "#4E86FF", fontSize: 14, fontWeight: 600, border: "1.5px dashed rgba(78,134,255,0.45)", boxShadow: "none", background: "rgba(255,255,255,0.6)" }}
+          >
+            <span style={{ fontSize: 30, fontWeight: 400 }}>＋</span>
+            {t("newCardNews")}
+          </button>
+          {decks.map((s) => (
+            <div key={s.id} style={tile}>
+              <div
+                onClick={() => onOpen(s.id)}
+                title={t("openDeck")}
+                style={{
+                  cursor: "pointer",
+                  aspectRatio: "4 / 5",
+                  position: "relative",
+                  background: s.deck.bg?.startsWith("data:") ? `center/cover no-repeat url("${s.deck.bg}")` : "linear-gradient(160deg,#2A2E3A,#15171E)",
+                }}
+              >
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-end", padding: 12, background: "linear-gradient(180deg, rgba(0,0,0,0.05) 40%, rgba(0,0,0,0.66) 100%)" }}>
+                  <div style={{ color: "#fff", fontSize: 14, fontWeight: 600, lineHeight: 1.35, letterSpacing: "-0.01em", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                    {coverThumbTitle(s.deck)}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, padding: "8px 10px" }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 12.5, color: "#1A1C22", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                  <div style={{ fontSize: 11, color: "#9AA0A6" }}>{relTime(s.updatedAt, t)}</div>
+                </div>
+                <div style={{ display: "flex", gap: 2, flex: "none" }}>
+                  <button title={t("rename")} style={iconBtn} onClick={() => { const n = window.prompt(t("renamePrompt"), s.name); if (n != null) onRename(s.id, n); }}>✎</button>
+                  <button title={t("duplicate")} style={iconBtn} onClick={() => onDuplicate(s.id)}>⧉</button>
+                  <button title={t("delete")} style={{ ...iconBtn, color: "#C5221F" }} onClick={() => { if (window.confirm(t("confirmDelete", { name: s.name }))) onDelete(s.id); }}>✕</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {decks.length === 0 && <div style={{ color: "#80868B", fontSize: 13, marginTop: 18, textAlign: "center" }}>{t("emptyLibrary")}</div>}
       </div>
     </div>
   );
@@ -589,19 +686,11 @@ export function Studio() {
 
 function StudioInner() {
   const { t, d } = useI18n();
-  const [deck, setDeck] = useState<Deck | null>(() => {
-    try {
-      const raw = localStorage.getItem(STORE_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw) as Deck;
-        return { ...saved, bg: saved.bg?.startsWith("data:") ? saved.bg : SAMPLE_DECK.bg };
-      }
-    } catch {
-      /* corrupt store → intro */
-    }
-    return null;
-  });
-  const [phase, setPhase] = useState<"intro" | "studio">("intro");
+  const [deck, setDeck] = useState<Deck | null>(null);
+  // 보관함: 이 브라우저에 저장된 카드뉴스 목록 + 현재 편집 중인 덱의 id.
+  const [library, setLibrary] = useState<SavedDeck[]>([]);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [phase, setPhase] = useState<"library" | "intro" | "studio">("library");
   const [sel, setSel] = useState(0);
   const [article, setArticle] = useState("");
   const [busy, setBusy] = useState<null | "ai" | "export" | "bg" | "caption" | "video">(null);
@@ -632,18 +721,54 @@ function StudioInner() {
     });
   }, []);
 
+  const reloadLibrary = () => listDecks().then(setLibrary);
+
+  // 첫 진입: 옛 단일 슬롯을 보관함으로 한 번 이관 → 목록 로드.
   useEffect(() => {
-    if (!deck) return;
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(deck));
-    } catch {
-      try {
-        localStorage.setItem(STORE_KEY, JSON.stringify({ ...deck, bg: "" }));
-      } catch {
-        /* quota — export still works */
-      }
-    }
-  }, [deck]);
+    if (!unlocked) return;
+    migrateOldSlot().then(reloadLibrary);
+  }, [unlocked]);
+
+  // 자동 저장: 편집 중인 덱(currentId)을 보관함에 디바운스 저장한다.
+  useEffect(() => {
+    if (!deck || !currentId) return;
+    const id = setTimeout(() => {
+      void saveDeck(currentId, deck.meta.title || "", deck);
+    }, 600);
+    return () => clearTimeout(id);
+  }, [deck, currentId]);
+
+  // 보관함에서 덱 열기 / 새로 만들기 / 삭제·복제·이름변경.
+  const openDeck = async (id: string) => {
+    const s = await getDeck(id);
+    if (!s) return;
+    setDeck({ ...s.deck, bg: s.deck.bg?.startsWith("data:") ? s.deck.bg : SAMPLE_DECK.bg });
+    setCurrentId(s.id);
+    setSel(0);
+    setNotice(null);
+    setPhase("studio");
+  };
+  const startNew = () => {
+    setNotice(null);
+    setPhase("intro");
+  };
+  const removeFromLibrary = async (id: string) => {
+    await deleteDeck(id);
+    if (id === currentId) setCurrentId(null);
+    await reloadLibrary();
+  };
+  const duplicateInLibrary = async (id: string) => {
+    await duplicateDeck(id);
+    await reloadLibrary();
+  };
+  const renameInLibrary = async (id: string, name: string) => {
+    await renameDeck(id, name);
+    await reloadLibrary();
+  };
+  const goLibrary = () => {
+    void reloadLibrary();
+    setPhase("library");
+  };
 
   const specs = deck ? activeSpecs(deck) : CARD_ORDER;
   const selIdx = Math.min(sel, specs.length - 1);
@@ -687,19 +812,22 @@ function StudioInner() {
         cover: { ...j.content.cover, kicker: j.content.cover.kicker?.trim() || (meta.issue ? `Weekly Insight: ${meta.issue} knot` : "Weekly Insight") },
       };
       setDeck((d) => {
-        const lang = j.lang ?? d?.lang;
+        // 새로 만들기는 깨끗한 베이스(SAMPLE_DECK)에서, 재구성은 현재 덱을 잇는다.
+        const base = fresh ? SAMPLE_DECK : (d ?? SAMPLE_DECK);
+        const lang = j.lang ?? base.lang;
         // 카드 언어가 바뀌면 그 언어에 맞는 폰트로 시드 (사용자는 '디자인'에서 변경 가능).
-        const langChanged = lang !== (d?.lang ?? "ko");
+        const langChanged = lang !== (base.lang ?? "ko");
         return {
-          ...(d ?? SAMPLE_DECK),
+          ...base,
           meta: { ...meta, title: j.title || meta.title },
           content,
           cards: j.cards,
           lang,
-          font: langChanged ? defaultFontFor(lang) : (d?.font ?? defaultFontFor(lang)),
-          bg: d?.bg ?? SAMPLE_DECK.bg,
+          font: langChanged ? defaultFontFor(lang) : (base.font ?? defaultFontFor(lang)),
+          bg: fresh ? SAMPLE_DECK.bg : (base.bg ?? SAMPLE_DECK.bg),
         };
       });
+      if (fresh) setCurrentId(newDeckId()); // 새 덱 → 보관함에 새 항목으로 저장
       setSel(0);
       setPhase("studio");
       setNotice(t("composed", { n: j.cards.length }));
@@ -888,14 +1016,29 @@ function StudioInner() {
   if (!checked) return null;
   if (!unlocked) return <LoginGate onUnlock={() => setUnlocked(true)} />;
 
+  if (phase === "library") {
+    return (
+      <Library
+        decks={library}
+        onOpen={openDeck}
+        onNew={startNew}
+        onDelete={removeFromLibrary}
+        onDuplicate={duplicateInLibrary}
+        onRename={renameInLibrary}
+      />
+    );
+  }
+
   if (phase === "intro") {
     return (
       <Intro
-        hasSaved={!!deck}
-        onContinue={() => setPhase("studio")}
+        canGoBack={library.length > 0}
+        onBack={goLibrary}
         onAI={(text, media) => void runAI(text, true, media)}
         onSample={() => {
-          setDeck((d) => d ?? SAMPLE_DECK);
+          setDeck({ ...SAMPLE_DECK });
+          setCurrentId(newDeckId());
+          setSel(0);
           setPhase("studio");
         }}
         busy={busy === "ai"}
@@ -905,7 +1048,7 @@ function StudioInner() {
   }
 
   if (!deck) {
-    setPhase("intro");
+    goLibrary();
     return null;
   }
 
@@ -921,7 +1064,7 @@ function StudioInner() {
     <div style={ui.root}>
       <header className="ek-topbar" style={ui.topbar}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button style={ui.iconPill} onClick={() => setPhase("intro")} title={t("backToStart")}>
+          <button style={ui.iconPill} onClick={goLibrary} title={t("backToLibrary")}>
             ←
           </button>
           <span style={{ ...ui.gradientText, fontSize: 16, fontWeight: 600 }}>Card News Generator</span>
