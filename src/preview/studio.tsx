@@ -39,6 +39,10 @@ const BGM_TRACKS = [
 ] as const;
 type MusicId = "none" | "upload" | (typeof BGM_TRACKS)[number]["id"];
 
+// Canva 9:16 릴스 생성 페이지. Canva의 무료 음악·영상은 Canva 안에서만 라이선스되므로
+// '끌어와 합치기'가 아니라 '카드를 보내 Canva에서 마감'한다 (새 탭으로 연다).
+const CANVA_REELS_URL = "https://www.canva.com/create/instagram-reels/";
+
 // 카드의 보이는 텍스트 글자 수(마크업·줄바꿈 제외) — 슬라이드 체류 시간의 근거.
 function cardTextLen(c: DeckContent, role: CardRole): number {
   const s = (...xs: (string | undefined)[]) =>
@@ -942,6 +946,13 @@ function StudioInner() {
       .catch((e) => setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`));
   };
 
+  // Canva로 보내 마감 — 9:16 캔버스를 새 탭에서 열고, 카드를 끌어다 놓도록 안내.
+  // (window.open은 클릭 제스처 안에서 동기로 호출해야 팝업 차단을 피한다.)
+  const openCanva = () => {
+    window.open(CANVA_REELS_URL, "_blank", "noopener,noreferrer");
+    setNotice(t("canvaHint"));
+  };
+
   /* AI 배경 생성 (Gemini) — 스타일 프레임은 서버가 강제한다. */
   const runGenBg = async () => {
     if (!deck || !bgPrompt.trim()) return;
@@ -1229,6 +1240,12 @@ function StudioInner() {
             <div style={{ fontSize: 11, color: "#80868B", lineHeight: 1.6 }}>
               {t("videoNote", { w, h, n: specs.length, sec: vidTotal.toFixed(0) })}
             </div>
+
+            <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", margin: "6px 0 2px" }} />
+            <button style={{ ...ui.exportSecondary, width: "100%" }} onClick={openCanva}>
+              {t("canvaFinish")}
+            </button>
+            <div style={{ fontSize: 11, color: "#80868B", lineHeight: 1.6 }}>{t("canvaNote")}</div>
           </Panel>
 
           <Panel title={t("bgPhoto")}>

@@ -104,6 +104,9 @@ const EN = {
   videoNoUpload: "Pick an audio file (or choose another track).",
   videoDone: "✓ Video ready — {mb}MB MP4 downloaded.",
   videoNote: "{n} cards ≈ {sec}s total, {w}×{h} MP4. Each card's time adapts to its text length; hard cuts (no animation). Encoded in your browser; first run loads the encoder once.",
+  canvaFinish: "Finish in Canva ↗",
+  canvaNote: "Want animation + Canva's free music/video? Open a 9:16 Canva canvas, then drag in the cards you got from “Export PNGs”. For monetized Reels use Canva's Audio tab (not the Popular Music tab).",
+  canvaHint: "✓ Opened a 9:16 Canva canvas — drop in your exported cards, then add free music/video and export there.",
   // library (my card-news)
   backToLibrary: "← My library",
   libraryTitle: "My card-news",
@@ -285,6 +288,9 @@ const KO: Dict = {
   videoNoUpload: "오디오 파일을 선택하세요 (또는 다른 트랙을 고르세요).",
   videoDone: "✓ 영상 완성 — {mb}MB MP4 다운로드됨.",
   videoNote: "카드 {n}장 ≈ 총 {sec}초, {w}×{h} MP4. 각 카드 시간은 글 길이에 맞춰 자동 조절, 하드컷(애니메이션 없음). 브라우저에서 인코딩하며 처음 한 번 인코더를 불러옵니다.",
+  canvaFinish: "Canva에서 마감하기 ↗",
+  canvaNote: "애니메이션 + Canva 무료 음악·영상으로 고급 마감하고 싶다면: 9:16 Canva 화면을 열고, ‘PNG 내보내기’로 받은 카드를 끌어다 놓으세요. 수익용 릴스는 Canva ‘Audio’ 탭 음악만 (‘Popular Music’ 탭은 비상업 전용).",
+  canvaHint: "✓ 9:16 Canva 화면을 열었어요 — 내보낸 카드를 끌어다 놓고 무료 음악·영상으로 마감해 내보내세요.",
   // 보관함 (내 카드뉴스)
   backToLibrary: "← 내 보관함",
   libraryTitle: "내 카드뉴스",
