@@ -47,7 +47,7 @@ let ffmpegRef: FFmpeg | null = null;
 // The core .js/.wasm are pulled through toBlobURL → blob: URLs, so Vite's module
 // transform never intercepts them (a plain coreURL gets a "?import" suffix and
 // fails to load as a module).
-export async function loadFfmpeg(): Promise<FFmpeg> {
+async function loadFfmpeg(): Promise<FFmpeg> {
   if (ffmpegRef) return ffmpegRef;
   if (typeof window === "undefined") throw new Error("ffmpeg.wasm runs in the browser only.");
   const [{ FFmpeg }, { toBlobURL }] = await Promise.all([import("@ffmpeg/ffmpeg"), import("@ffmpeg/util")]);
@@ -59,15 +59,6 @@ export async function loadFfmpeg(): Promise<FFmpeg> {
   await ff.load({ coreURL, wasmURL });
   ffmpegRef = ff;
   return ff;
-}
-
-export function disposeFfmpeg(): void {
-  try {
-    ffmpegRef?.terminate();
-  } catch {
-    /* already gone */
-  }
-  ffmpegRef = null;
 }
 
 const b64ToBytes = (b64: string): Uint8Array => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
