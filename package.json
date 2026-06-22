@@ -39,6 +39,7 @@
     "@fontsource/open-sans": "^5.2.7",
     "@fontsource/prompt": "^5.2.8",
     "@sparticuz/chromium": "^133.0.0",
+    "@supabase/supabase-js": "^2.108.2",
     "archiver": "^7.0.1",
     "jszip": "^3.10.1",
     "playwright-core": "1.50",

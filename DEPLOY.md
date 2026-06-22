@@ -15,7 +15,15 @@
    | `ANTHROPIC_API_KEY` | `sk-ant-...` (console.anthropic.com, 크레딧 필요) |
    | `STUDIO_PASSWORD` | 원하는 비밀번호 (이걸로 접근을 막습니다) |
    | `GEMINI_API_KEY` | *(선택)* AI 배경 생성용 (aistudio.google.com → API key). 없으면 해당 버튼만 에러를 띄우고 나머지는 정상 동작 |
+   | `VITE_SUPABASE_URL` | *(선택)* 로그인/계정용 Supabase Project URL (`https://xxxx.supabase.co`). 빌드 시 클라이언트에 포함됨 |
+   | `VITE_SUPABASE_ANON_KEY` | *(선택)* Supabase anon public 키 (`eyJ...`). **공개값** — RLS가 데이터를 보호함 |
 5. **Deploy** → 1~2분 후 `https://eigen-knot-xxxx.vercel.app` 생성
+
+> **로그인(매직링크) 설정** — 위 두 `VITE_SUPABASE_*` 변수가 있어야 로그인 버튼이 동작합니다.
+> 로컬 개발은 프로젝트 루트 `.env`에 같은 두 변수를 넣으세요. 그리고 Supabase 대시보드
+> → **Authentication → URL Configuration → Redirect URLs** 에 앱 주소를 추가해야 매직링크가
+> 돌아옵니다: `http://localhost:5173` (개발) + 배포 URL(`https://<your>.vercel.app`).
+> (무료 플랜은 기본 이메일 발송이 시간당 몇 통으로 제한되니, 사용량이 늘면 SMTP를 연결하세요.)
 
 > CLI로 하려면: `npm i -g vercel && vercel link && vercel --prod` 후 대시보드(또는
 > `vercel env add`)에서 위 두 변수를 설정.

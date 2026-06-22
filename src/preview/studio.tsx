@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import JSZip from "jszip";
 import type { CardRole, CardSpec, Deck, DeckContent } from "@/types";
 import { CARD_ORDER, ALL_ROLES, PLATFORMS, activeSpecs, deckSize, defaultClosing } from "@/types";
@@ -10,6 +10,7 @@ import { cardOverflow } from "./shared";
 import { apiFetch, checkPassword, getPw, savePw, imageToBg, b64ToBg, deliverFiles, fileToMedia, type MediaAttachment } from "./api";
 import { encodeSlideshow, type AudioInput } from "./video";
 import { listDecks, getDeck, saveDeck, deleteDeck, duplicateDeck, renameDeck, migrateOldSlot, newDeckId, type SavedDeck } from "./library";
+import { supabaseReady, sendMagicLink, signOut, currentEmail, onAuthChange } from "./supabase";
 import { abstractBg, randomSeed } from "@/lib/abstractBg";
 import { I18nProvider, LangSwitch, useI18n } from "./i18n";
 
@@ -601,6 +602,77 @@ function relTime(ts: number, t: (k: "relNow" | "relMin" | "relHour" | "relDay", 
   return new Date(ts).toLocaleDateString();
 }
 
+// 로그인(매직링크) — 보관함 헤더에 들어간다. 로그인하면 이메일 칩 + 로그아웃,
+// 비로그인이면 게스트 칩 + 로그인 버튼(이메일 폼 모달).
+function AuthControl() {
+  const { t } = useI18n();
+  const [email, setEmail] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    void currentEmail().then(setEmail);
+    return onAuthChange((e) => {
+      setEmail(e);
+      if (e) { setOpen(false); setSent(false); }
+    });
+  }, []);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!supabaseReady) { setErr(t("loginNotReady")); return; }
+    setBusy(true);
+    setErr(null);
+    try {
+      await sendMagicLink(input);
+      setSent(true);
+    } catch (ex) {
+      setErr(ex instanceof Error ? ex.message : String(ex));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (email) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ ...ui.chip, cursor: "default", maxWidth: 190, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={email}>☁ {email}</span>
+        <button style={ui.chip} onClick={() => void signOut()}>{t("logout")}</button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ ...ui.chip, cursor: "default" }}>{t("guestMode")}</span>
+        <button style={ui.chip} onClick={() => { setErr(null); setSent(false); setOpen(true); }}>{t("loginBtn")}</button>
+      </div>
+      {open && (
+        <div style={{ ...ui.gate, zIndex: 50 }} onClick={() => setOpen(false)}>
+          <div style={ui.gateCard} onClick={(e) => e.stopPropagation()}>
+            <div style={{ ...ui.gradientText, fontSize: 20, fontWeight: 600 }}>{t("loginTitle")}</div>
+            <div style={{ color: "#5F6368", fontSize: 13, margin: "8px 0 16px", lineHeight: 1.6 }}>{t("loginSub")}</div>
+            {sent ? (
+              <div style={{ fontSize: 13.5, color: "#1E8E3E", lineHeight: 1.6 }}>{t("magicSent", { email: input })}</div>
+            ) : (
+              <form onSubmit={(e) => void submit(e)}>
+                <input style={{ ...ui.input, marginBottom: 10 }} type="email" required autoFocus placeholder={t("emailPlaceholder")} value={input} onChange={(e) => setInput(e.target.value)} />
+                <button style={{ ...ui.primaryPill, width: "100%", opacity: busy ? 0.6 : 1 }} type="submit" disabled={busy}>{busy ? t("sending") : t("sendLink")}</button>
+              </form>
+            )}
+            {err && <div style={{ color: "#C5221F", fontSize: 12.5, marginTop: 10 }}>{err}</div>}
+            <button style={{ ...ui.chip, marginTop: 14 }} onClick={() => setOpen(false)}>{t("cancel")}</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function Library({
   decks,
   onOpen,
@@ -617,7 +689,6 @@ function Library({
   onRename: (id: string, name: string) => void;
 }) {
   const { t } = useI18n();
-  const [note, setNote] = useState<string | null>(null);
   const tile: CSSProperties = { background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 12px rgba(66,133,244,0.08)" };
   const iconBtn: CSSProperties = { background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: "#5F6368", padding: 4, lineHeight: 1 };
   return (
@@ -626,12 +697,9 @@ function Library({
       <div style={{ width: "100%", maxWidth: 940, margin: "0 auto", padding: "0 16px", boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <div className="ek-intro-title" style={{ ...ui.gradientTitle, textAlign: "left", fontSize: 26 }}>{t("libraryTitle")}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ ...ui.chip, cursor: "default" }}>{t("guestMode")}</span>
-            <button style={ui.chip} onClick={() => setNote(t("loginSoon"))}>{t("loginBtn")}</button>
-          </div>
+          <AuthControl />
         </div>
-        <div style={{ color: note ? "#1E8E3E" : "#5F6368", fontSize: 13, margin: "8px 0 20px", lineHeight: 1.6 }}>{note ?? t("librarySub")}</div>
+        <div style={{ color: "#5F6368", fontSize: 13, margin: "8px 0 20px", lineHeight: 1.6 }}>{t("librarySub")}</div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 14 }}>
           <button
