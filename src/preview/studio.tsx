@@ -152,6 +152,7 @@ function Thumb({
   selected,
   onSelect,
   onZoom,
+  onDownload,
   width,
 }: {
   deck: Deck;
@@ -159,6 +160,7 @@ function Thumb({
   selected: boolean;
   onSelect: () => void;
   onZoom?: () => void;
+  onDownload?: () => void;
   width: number;
 }) {
   const { t, d } = useI18n();
@@ -174,9 +176,10 @@ function Thumb({
   });
   const dim = deck.dims?.[spec.role] ?? spec.dim;
   return (
-    <div style={{ cursor: "pointer" }} onClick={onSelect} onDoubleClick={onZoom}>
+    <div className="ek-thumb" style={{ cursor: "pointer" }} onClick={onSelect} onDoubleClick={onZoom}>
       <div
         style={{
+          position: "relative",
           width,
           height: Math.round(h * scale),
           overflow: "hidden",
@@ -186,6 +189,34 @@ function Thumb({
           transition: "outline .12s ease, box-shadow .12s ease",
         }}
       >
+        {onDownload && (
+          <button
+            className="ek-thumb-dl"
+            title={t("downloadThis")}
+            onClick={(e) => { e.stopPropagation(); onDownload(); }}
+            style={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              zIndex: 2,
+              width: 30,
+              height: 30,
+              borderRadius: "50%",
+              border: "none",
+              cursor: "pointer",
+              background: "rgba(20,22,30,0.6)",
+              color: "#fff",
+              fontSize: 14,
+              lineHeight: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backdropFilter: "blur(2px)",
+            }}
+          >
+            ↓
+          </button>
+        )}
         <div ref={ref} style={{ width: w, height: h, transform: `scale(${scale})`, transformOrigin: "top left" }}>
           <RenderCard deck={deck} spec={spec} />
         </div>
@@ -215,7 +246,7 @@ function useIsMobile(): boolean {
 /* ── 모바일 캐러셀: 인스타그램과 같은 좌우 스와이프 + 스냅 ─────────────────
    확대 없이 현재 크기로 한 장씩 넘겨 보고, 멈춘 카드가 곧 선택된 카드가
    되어 아래 편집 패널과 동기화된다. ─────────────────────────────────────── */
-function CarouselView({ deck, selIdx, onSel }: { deck: Deck; selIdx: number; onSel: (i: number) => void }) {
+function CarouselView({ deck, selIdx, onSel, onDownload }: { deck: Deck; selIdx: number; onSel: (i: number) => void; onDownload?: (i: number) => void }) {
   const specs = activeSpecs(deck);
   const ref = useRef<HTMLDivElement>(null);
   const gap = 14;
@@ -267,7 +298,7 @@ function CarouselView({ deck, selIdx, onSel }: { deck: Deck; selIdx: number; onS
             transition: "transform .25s ease, opacity .25s ease",
           }}
         >
-          <Thumb deck={deck} index={i} selected={i === selIdx} onSelect={() => onSel(i)} width={cardW} />
+          <Thumb deck={deck} index={i} selected={i === selIdx} onSelect={() => onSel(i)} onDownload={onDownload && (() => onDownload(i))} width={cardW} />
         </div>
       ))}
     </div>
@@ -282,11 +313,13 @@ function GalleryView({
   selIdx,
   onSel,
   onClose,
+  onDownload,
 }: {
   deck: Deck;
   selIdx: number;
   onSel: (i: number) => void;
   onClose: () => void;
+  onDownload?: (i: number) => void;
 }) {
   const { t, d } = useI18n();
   const specs = activeSpecs(deck);
@@ -332,9 +365,16 @@ function GalleryView({
           {String(selIdx + 1).padStart(2, "0")} {d.roles[spec.role]} · {selIdx + 1}/{specs.length}
           <span style={{ marginLeft: 12, color: "#9AA0A6", fontSize: 11.5 }}>{t("galleryHint")}</span>
         </span>
-        <button style={ui.chip} onClick={onClose}>
-          {t("galleryClose")}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {onDownload && (
+            <button style={ui.chip} onClick={() => onDownload(selIdx)}>
+              {t("downloadThisCard")}
+            </button>
+          )}
+          <button style={ui.chip} onClick={onClose}>
+            {t("galleryClose")}
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "flex", justifyContent: "center" }} onDoubleClick={onClose}>
@@ -951,6 +991,31 @@ function StudioInner() {
     }
   };
 
+  /* 카드 1장만 내보내기 — 전체 ZIP과 같은 캡처 경로로 해당 인덱스만 받아 단일 PNG로 배달. */
+  const runExportOne = async (index: number) => {
+    if (!deck || busy) return;
+    setBusy("export");
+    setNotice(null);
+    setProg(`${index + 1}/${specs.length}`);
+    try {
+      let card: { name: string; b64: string };
+      try {
+        card = await apiFetch("/api/capture-card", { deck, index });
+      } catch {
+        card = await apiFetch("/api/capture-card", { deck, index });
+      }
+      const bytes = Uint8Array.from(atob(card.b64), (ch) => ch.charCodeAt(0));
+      const file = new File([bytes], card.name, { type: "image/png" });
+      const how = await deliverFiles([file], new Blob([bytes], { type: "image/png" }), card.name);
+      setNotice(how === "shared" ? t("savedShare") : t("oneDownloaded", { name: card.name }));
+    } catch (e) {
+      setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(null);
+      setProg("");
+    }
+  };
+
   /* 영상(릴스/쇼츠) 내보내기 — 카드 PNG들을 그대로 이어붙여 9:16 MP4로 인코딩.
      캡처는 PNG 내보내기와 동일한 경로(카드당 1회 재시도). 인코딩은 브라우저
      안에서 ffmpeg.wasm(싱글스레드)으로 처리하므로 서버/헤더 변경이 없다. */
@@ -1506,9 +1571,9 @@ function StudioInner() {
         {/* ── 카드: 모바일=좌우 스와이프 캐러셀 / 데스크톱=그리드·갤러리 ── */}
         <main className="ek-main" style={{ flex: 1, minWidth: 0 }}>
           {isMobile ? (
-            <CarouselView deck={deck} selIdx={selIdx} onSel={setSel} />
+            <CarouselView deck={deck} selIdx={selIdx} onSel={setSel} onDownload={(i) => void runExportOne(i)} />
           ) : gallery ? (
-            <GalleryView deck={deck} selIdx={selIdx} onSel={setSel} onClose={() => setGallery(false)} />
+            <GalleryView deck={deck} selIdx={selIdx} onSel={setSel} onClose={() => setGallery(false)} onDownload={(i) => void runExportOne(i)} />
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(248px, 1fr))", gap: 22 }}>
               {specs.map((s, i) => (
@@ -1522,6 +1587,7 @@ function StudioInner() {
                     setSel(i);
                     setGallery(true);
                   }}
+                  onDownload={() => void runExportOne(i)}
                   width={248}
                 />
               ))}

@@ -2,6 +2,12 @@
 html, body { margin: 0; padding: 0; background: #EBF4FF; }
 img, svg { display: block; }
 
+/* Per-card download button: reveal on hover (desktop), always show on touch. */
+.ek-thumb-dl { opacity: 0; transition: opacity .15s ease; }
+.ek-thumb:hover .ek-thumb-dl { opacity: 1; }
+.ek-thumb-dl:hover { background: rgba(20, 22, 30, 0.82) !important; }
+@media (hover: none), (max-width: 760px) { .ek-thumb-dl { opacity: 1; } }
+
 /* Korean line-breaking: break only at spaces (어절 단위), never mid-word.
    Missing this is the "너무 어/린 나이" bug (PRD §2.2, §10). */
 .ek-ko {
