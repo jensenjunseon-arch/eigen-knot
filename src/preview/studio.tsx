@@ -689,7 +689,10 @@ function AuthControl() {
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ ...ui.chip, cursor: "default" }}>{t("guestMode")}</span>
-        <button style={ui.chip} onClick={() => { setErr(null); setSent(false); setOpen(true); }}>{t("loginBtn")}</button>
+        {/* 로그인은 Supabase 키가 설정된 환경에서만 노출 (미설정 시 깨진 버튼 방지). */}
+        {supabaseReady && (
+          <button style={ui.chip} onClick={() => { setErr(null); setSent(false); setOpen(true); }}>{t("loginBtn")}</button>
+        )}
       </div>
       {open && (
         <div style={{ ...ui.gate, zIndex: 50 }} onClick={() => setOpen(false)}>
@@ -1159,8 +1162,9 @@ function StudioInner() {
         onBack={goLibrary}
         onAI={(text, media) => void runAI(text, true, media)}
         onSample={() => {
+          // 샘플은 둘러보기용 데모 — 보관함에 쌓이지 않게 휘발성(currentId=null)으로 연다.
           setDeck({ ...SAMPLE_DECK });
-          setCurrentId(newDeckId());
+          setCurrentId(null);
           setSel(0);
           setPhase("studio");
         }}
