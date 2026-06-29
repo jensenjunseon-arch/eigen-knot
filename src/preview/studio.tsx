@@ -153,6 +153,8 @@ function Thumb({
   onSelect,
   onZoom,
   onDownload,
+  checked,
+  onToggleCheck,
   width,
 }: {
   deck: Deck;
@@ -161,6 +163,8 @@ function Thumb({
   onSelect: () => void;
   onZoom?: () => void;
   onDownload?: () => void;
+  checked?: boolean;
+  onToggleCheck?: () => void;
   width: number;
 }) {
   const { t, d } = useI18n();
@@ -185,10 +189,41 @@ function Thumb({
           overflow: "hidden",
           borderRadius: 14,
           outline: selected ? "2px solid #4E86FF" : "1px solid rgba(0,0,0,0.09)",
-          boxShadow: selected ? "0 0 0 4px rgba(78,134,255,0.2), 0 8px 24px -8px rgba(66,133,244,0.25)" : "0 4px 16px -4px rgba(0,0,0,0.12)",
+          boxShadow: checked
+            ? "inset 0 0 0 3px #4E86FF, 0 4px 16px -4px rgba(0,0,0,0.12)"
+            : selected
+              ? "0 0 0 4px rgba(78,134,255,0.2), 0 8px 24px -8px rgba(66,133,244,0.25)"
+              : "0 4px 16px -4px rgba(0,0,0,0.12)",
           transition: "outline .12s ease, box-shadow .12s ease",
         }}
       >
+        {onToggleCheck && (
+          <button
+            className={"ek-thumb-check" + (checked ? " ek-thumb-check--on" : "")}
+            title={t("selectForExport")}
+            onClick={(e) => { e.stopPropagation(); onToggleCheck(); }}
+            style={{
+              position: "absolute",
+              top: 8,
+              left: 8,
+              zIndex: 2,
+              width: 26,
+              height: 26,
+              borderRadius: 7,
+              cursor: "pointer",
+              border: checked ? "none" : "1.5px solid rgba(255,255,255,0.9)",
+              background: checked ? "#4E86FF" : "rgba(20,22,30,0.45)",
+              color: "#fff",
+              fontSize: 14,
+              lineHeight: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {checked ? "✓" : ""}
+          </button>
+        )}
         {onDownload && (
           <button
             className="ek-thumb-dl"
@@ -246,7 +281,7 @@ function useIsMobile(): boolean {
 /* ── 모바일 캐러셀: 인스타그램과 같은 좌우 스와이프 + 스냅 ─────────────────
    확대 없이 현재 크기로 한 장씩 넘겨 보고, 멈춘 카드가 곧 선택된 카드가
    되어 아래 편집 패널과 동기화된다. ─────────────────────────────────────── */
-function CarouselView({ deck, selIdx, onSel, onDownload }: { deck: Deck; selIdx: number; onSel: (i: number) => void; onDownload?: (i: number) => void }) {
+function CarouselView({ deck, selIdx, onSel, onDownload, selectedExport, onToggleCheck }: { deck: Deck; selIdx: number; onSel: (i: number) => void; onDownload?: (i: number) => void; selectedExport?: Set<number>; onToggleCheck?: (i: number) => void }) {
   const specs = activeSpecs(deck);
   const ref = useRef<HTMLDivElement>(null);
   const gap = 14;
@@ -298,7 +333,7 @@ function CarouselView({ deck, selIdx, onSel, onDownload }: { deck: Deck; selIdx:
             transition: "transform .25s ease, opacity .25s ease",
           }}
         >
-          <Thumb deck={deck} index={i} selected={i === selIdx} onSelect={() => onSel(i)} onDownload={onDownload && (() => onDownload(i))} width={cardW} />
+          <Thumb deck={deck} index={i} selected={i === selIdx} onSelect={() => onSel(i)} onDownload={onDownload && (() => onDownload(i))} checked={selectedExport?.has(i)} onToggleCheck={onToggleCheck && (() => onToggleCheck(i))} width={cardW} />
         </div>
       ))}
     </div>
@@ -824,6 +859,8 @@ function StudioInner() {
   const [prog, setProg] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [gallery, setGallery] = useState(false);
+  // 선택 다운로드: 내보낼 카드 인덱스 집합. 비어 있으면 '전체'만, 있으면 선택분만.
+  const [selectedExport, setSelectedExport] = useState<Set<number>>(new Set());
   const isMobile = useIsMobile();
   const [unlocked, setUnlocked] = useState(false);
   const [checked, setChecked] = useState(false);
@@ -952,72 +989,79 @@ function StudioInner() {
     }
   };
 
-  /* PNG 내보내기 — 카드 1장씩 캡처 후 브라우저에서 ZIP 조립.
-     모바일(Web Share 지원)에서는 PNG들을 공유 시트로도 넘길 수 있게 보관 →
-     "사진첩에 저장" 버튼 (iOS 공유 시트의 '이미지 저장'이 사진 앱으로 들어간다). */
-  const runExport = async () => {
-    if (!deck) return;
+  /* PNG 내보내기 코어 — 주어진 카드 인덱스들만 캡처해 배달한다.
+     1장이면 PNG 단일, 여러 장이면 ZIP. 모바일=공유 시트(사진첩), 데스크톱=다운로드.
+     전체·단일·선택 내보내기가 모두 이 함수를 공유한다. (카드당 1회 재시도) */
+  const exportCards = async (indices: number[]): Promise<boolean> => {
+    if (!deck || busy || !indices.length) return false;
     setBusy("export");
     setNotice(null);
+    const total = indices.length;
     try {
-      const n = specs.length;
-      const zip = new JSZip();
       const files: File[] = [];
+      const zip = total > 1 ? new JSZip() : null;
       let anyOverflow = false;
-      for (let i = 0; i < n; i++) {
-        setProg(`${i + 1}/${n}`);
-        // 일시적 네트워크/콜드스타트 오류로 10장짜리 내보내기가 통째로 죽지 않게
-        // 카드마다 1번 재시도.
+      for (let k = 0; k < total; k++) {
+        const index = indices[k];
+        setProg(`${k + 1}/${total}`);
         let card: { name: string; b64: string; overflow: boolean };
         try {
-          card = await apiFetch("/api/capture-card", { deck, index: i });
+          card = await apiFetch("/api/capture-card", { deck, index });
         } catch {
-          setProg(t("retrying", { p: `${i + 1}/${n}` }));
-          card = await apiFetch("/api/capture-card", { deck, index: i });
+          setProg(t("retrying", { p: `${k + 1}/${total}` }));
+          card = await apiFetch("/api/capture-card", { deck, index });
         }
-        zip.file(card.name, card.b64, { base64: true });
         const bytes = Uint8Array.from(atob(card.b64), (ch) => ch.charCodeAt(0));
         files.push(new File([bytes], card.name, { type: "image/png" }));
+        zip?.file(card.name, card.b64, { base64: true });
         if (card.overflow) anyOverflow = true;
       }
-      setProg("zip…");
-      const blob = await zip.generateAsync({ type: "blob" });
-      // 모바일=공유 시트(사진첩) / 데스크톱·폴백=다운로드. 개별 PNG는 공유로,
-      // 폴백 다운로드는 ZIP으로 받는다.
-      const how = await deliverFiles(files, blob, resolvedZipName(deck));
-      setNotice(anyOverflow ? t("someOverflow") : how === "shared" ? t("savedShare") : t("downloadDone", { n }));
+      let blob: Blob;
+      let filename: string;
+      if (zip) {
+        setProg("zip…");
+        blob = await zip.generateAsync({ type: "blob" });
+        filename = resolvedZipName(deck);
+      } else {
+        blob = files[0]; // File extends Blob — deliver the single PNG directly
+        filename = files[0].name;
+      }
+      const how = await deliverFiles(files, blob, filename);
+      setNotice(
+        anyOverflow
+          ? t("someOverflow")
+          : how === "shared"
+            ? t("savedShare")
+            : total === 1
+              ? t("oneDownloaded", { name: files[0].name })
+              : t("downloadDone", { n: total }),
+      );
+      return true;
     } catch (e) {
       setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
+      return false;
     } finally {
       setBusy(null);
       setProg("");
     }
   };
 
-  /* 카드 1장만 내보내기 — 전체 ZIP과 같은 캡처 경로로 해당 인덱스만 받아 단일 PNG로 배달. */
-  const runExportOne = async (index: number) => {
-    if (!deck || busy) return;
-    setBusy("export");
-    setNotice(null);
-    setProg(`${index + 1}/${specs.length}`);
-    try {
-      let card: { name: string; b64: string };
-      try {
-        card = await apiFetch("/api/capture-card", { deck, index });
-      } catch {
-        card = await apiFetch("/api/capture-card", { deck, index });
-      }
-      const bytes = Uint8Array.from(atob(card.b64), (ch) => ch.charCodeAt(0));
-      const file = new File([bytes], card.name, { type: "image/png" });
-      const how = await deliverFiles([file], new Blob([bytes], { type: "image/png" }), card.name);
-      setNotice(how === "shared" ? t("savedShare") : t("oneDownloaded", { name: card.name }));
-    } catch (e) {
-      setNotice(`✗ ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setBusy(null);
-      setProg("");
-    }
+  const runExport = () => void exportCards(specs.map((_, i) => i)); // 전체
+  const runExportOne = (index: number) => void exportCards([index]); // 한 장
+  const runExportSelected = () => {
+    const picked = [...selectedExport].sort((a, b) => a - b);
+    void exportCards(picked).then((ok) => {
+      if (ok) setSelectedExport(new Set());
+    });
   };
+  const toggleExportSelect = (index: number) =>
+    setSelectedExport((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  const selectAllExport = () => setSelectedExport(new Set(specs.map((_, i) => i)));
 
   /* 영상(릴스/쇼츠) 내보내기 — 카드 PNG들을 그대로 이어붙여 9:16 MP4로 인코딩.
      캡처는 PNG 내보내기와 동일한 경로(카드당 1회 재시도). 인코딩은 브라우저
@@ -1213,6 +1257,16 @@ function StudioInner() {
             <span className="ek-export-short">{busy === "export" ? (prog || "…") : t("exportShort")}</span>
           </button>
         </div>
+        {selectedExport.size > 0 && (
+          <div className="ek-topbar-notice" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", color: "#2D3142" }}>
+            <span style={{ fontWeight: 600 }}>{t("selectedCount", { n: selectedExport.size })}</span>
+            <button style={{ ...ui.primaryPill, padding: "6px 14px", fontSize: 12.5, opacity: busy ? 0.6 : 1 }} disabled={busy !== null} onClick={runExportSelected}>
+              {busy === "export" ? (prog || "…") : t("exportSelected", { n: selectedExport.size })}
+            </button>
+            <button style={ui.chip} disabled={busy !== null} onClick={selectAllExport}>{t("selectAll")}</button>
+            <button style={ui.chip} onClick={() => setSelectedExport(new Set())}>{t("clearSelection")}</button>
+          </div>
+        )}
         {notice && <div className="ek-topbar-notice" style={{ color: noticeColor(notice) }}>{notice}</div>}
       </header>
 
@@ -1575,7 +1629,7 @@ function StudioInner() {
         {/* ── 카드: 모바일=좌우 스와이프 캐러셀 / 데스크톱=그리드·갤러리 ── */}
         <main className="ek-main" style={{ flex: 1, minWidth: 0 }}>
           {isMobile ? (
-            <CarouselView deck={deck} selIdx={selIdx} onSel={setSel} onDownload={(i) => void runExportOne(i)} />
+            <CarouselView deck={deck} selIdx={selIdx} onSel={setSel} onDownload={(i) => void runExportOne(i)} selectedExport={selectedExport} onToggleCheck={toggleExportSelect} />
           ) : gallery ? (
             <GalleryView deck={deck} selIdx={selIdx} onSel={setSel} onClose={() => setGallery(false)} onDownload={(i) => void runExportOne(i)} />
           ) : (
@@ -1592,6 +1646,8 @@ function StudioInner() {
                     setGallery(true);
                   }}
                   onDownload={() => void runExportOne(i)}
+                  checked={selectedExport.has(i)}
+                  onToggleCheck={() => toggleExportSelect(i)}
                   width={248}
                 />
               ))}
